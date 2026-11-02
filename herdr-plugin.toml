@@ -1,0 +1,50 @@
+id = "thomashuangth.eartag"
+name = "Eartag"
+version = "0.1.0"
+min_herdr_version = "0.9.3"
+description = "A recap panel next to every agent: what you asked, what it did and whether it is done, history, files, context and 5h/7d quotas"
+platforms = ["linux", "macos"]
+
+[[actions]]
+id = "toggle"
+title = "Eartag: show or hide for this agent"
+contexts = ["pane"]
+command = ["python3", "eartag.py", "toggle"]
+
+# After a herdr restart, panels come back as plain shells: close them.
+[[startup]]
+command = ["python3", "eartag.py", "startup"]
+
+[[events]]
+on = "pane.agent_detected"
+command = ["python3", "eartag.py", "event"]
+
+[[panes]]
+id = "panel"
+title = "Eartag"
+placement = "split"
+command = ["python3", "eartag.py", "panel"]
+
+[[actions]]
+id = "setup"
+title = "Eartag: enable quotas (Claude statusline relay) and the prefix+i key"
+contexts = ["global"]
+command = ["python3", "eartag.py", "setup"]
+
+[[actions]]
+id = "undo-setup"
+title = "Eartag: undo setup (restore statusline, remove prefix+i)"
+contexts = ["global"]
+command = ["python3", "eartag.py", "setup", "--remove"]
+
+[[actions]]
+id = "unhide"
+title = "Eartag: show hidden agents again"
+contexts = ["global"]
+command = ["python3", "eartag.py", "unhide"]
+
+[[actions]]
+id = "doctor"
+title = "Eartag: diagnostics (read with herdr plugin log list)"
+contexts = ["global"]
+command = ["python3", "eartag.py", "doctor"]
