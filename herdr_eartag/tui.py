@@ -7,6 +7,7 @@ import re
 import select
 import shutil
 import signal
+import subprocess
 import sys
 import termios
 import threading
@@ -14,7 +15,7 @@ import time
 import tty
 from typing import List, Optional
 
-from . import herdr, prefs
+from . import herdr, pad, prefs
 from .config import Config, herdr_border_overhead
 from .i18n import Tr
 from .panel import PanelModel
@@ -167,6 +168,7 @@ class App:
         self.running = True
         self.resized = False
         self.next_tick = 0.0
+        self.pad_line: Optional[int] = None   # set by a click on the Pad tab or a mark: open nvim there
         # herdr calls (resize, focus, notify, setup) run here so the input loop
         # never stops reading the pane while herdr is busy.
         self._jobs: "queue.Queue" = queue.Queue()
@@ -361,7 +363,18 @@ class App:
             self.dirty = True
         elif action == "setup":
             self.run_action("setup")
+        elif self.request_pad(action):
+            return  # keep focus: nvim takes the keyboard
         self.give_back_focus()
+
+    def request_pad(self, action: str) -> bool:
+        """`tab:pad` opens the pad at `a, `mark:X` at section X. False when there is no pad."""
+        current = self.model.pads.pad
+        if not current or not (action == "tab:pad" or action.startswith("mark:")):
+            return False
+        letter = "a" if action == "tab:pad" else action[5:]
+        self.pad_line = current.line_of(letter) or 1
+        return True
 
     def on_key(self, key: bytes) -> None:
         items = [a for a, _, _, _ in self.menu_items()]
@@ -428,6 +441,9 @@ class App:
                 self.on_key(b"\x1b")
                 pos += 1
                 continue
+            if not self.menu_open and data[pos:pos + 1] == b"\t" and self.request_pad("tab:pad"):
+                pos += 1
+                continue
             if not self.menu_open:
                 # Text typed while the panel has focus belongs to the agent: pass it on.
                 end = pos
@@ -459,9 +475,31 @@ class App:
         signal.signal(signal.SIGTERM, on_term)
         signal.signal(signal.SIGHUP, on_term)
         self.register()
+        while self.running:
+            self._loop()
+            if self.running and self.pad_line is not None:
+                self.edit_pad()
+        self.unregister()
+        return 0
+
+    def edit_pad(self) -> None:
+        """Hand the pane to nvim on the pad; the recap comes back when nvim exits."""
+        line, self.pad_line = self.pad_line, None
+        current = self.model.pads.pad
+        if current is None:
+            return
+        try:
+            subprocess.run(pad.nvim_argv(current.path, line))
+        except OSError:
+            log_error()
+        self.dirty = True
+        self.give_back_focus()
+
+    def _loop(self) -> None:
+        """The recap screen, until the panel stops or a pad edit is requested."""
         fd = sys.stdin.fileno()
         with Screen(self.theme) as screen:
-            while self.running:
+            while self.running and self.pad_line is None:
                 now = time.time()
                 if self.model.poll(now):
                     self.dirty = True
@@ -489,7 +527,6 @@ class App:
                     except OSError:
                         data = b""
                     if not data:
+                        self.running = False
                         break
                     self.parse_input(data)
-        self.unregister()
-        return 0

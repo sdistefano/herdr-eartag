@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from . import claude, codex, efforts, gitinfo, herdr, prefs, statusline, textutil
+from . import claude, codex, efforts, gitinfo, herdr, pad, prefs, statusline, textutil
 from .config import Config
 from .i18n import Tr
 from .render import Bar, View
@@ -65,6 +65,7 @@ class PanelModel:
         self.needs_setup = False
         self.set_summarize(prefs.summarize_wanted(prefs.load(), cfg.summarize))
         self.error = ""
+        self.pads = pad.PadWatcher()  # the scratch pad of the agent's herdr tab, if any
 
     def set_summarize(self, on: bool) -> None:
         if not on:
@@ -114,6 +115,7 @@ class PanelModel:
                 self.status_since = now
                 changed = True
             changed |= self._poll_transcript()
+            changed |= self.pads.refresh(pane, now)
             snap = statusline.read_session(self.session_id) if self.agent == "claude" else None
             rate = statusline.read_rate_limits() if self.agent == "claude" else None
             if snap != self.session_snap or rate != self.rate_snap:
@@ -356,6 +358,9 @@ class PanelModel:
             v.files_title = tr("files")
             v.files = list(reversed(list(data.files.keys())))
             v.diff = self.diff
+        if self.pads.pad:
+            v.pad_name = self.pads.pad.name
+            v.marks = pad.chips(self.pads.pad)
         return v
 
     def _other_agent_model(self) -> Tuple[str, str]:

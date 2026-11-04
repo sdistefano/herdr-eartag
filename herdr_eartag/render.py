@@ -89,6 +89,8 @@ class View:
     footnote_action: str = ""
     menu: Optional[List[Tuple[str, str, str, str]]] = None   # (action, icon, icon_role, label)
     menu_index: int = 0
+    pad_name: str = ""                                   # the tab's scratch pad, when there is one
+    marks: List[Tuple[str, str, str]] = field(default_factory=list)  # (letter, text, role)
 
 
 @dataclass
@@ -268,9 +270,15 @@ def _render_panel(v: View) -> Frame:
     if v.mode_tag:
         left.append((" {} {}".format(sym["sep"], v.mode_tag), "sub"))
     badge: Line = [(" {} {} ".format(status_icon, v.status_label), "bg:{} on:{} b".format(status_role, status_role))]
-    top: List[Line] = [[], _lr(left, badge, inner), []]
+    tabs, tab_hits = _tab_bar(v, sym, inner)
+    top: List[Line] = [tabs, _lr(left, badge, inner), []]
     top.append([(sym["rule"] * inner, "rule")])
     top.append([])
+    strip_hits: List[Tuple[int, int, str]] = []
+    strip_y = len(top)
+    if v.marks:
+        strip, strip_hits = _marks_strip(v.marks, inner)
+        top += [strip, []]
     if v.notif:
         top.append([(sym["notif"] + " ", v.notif[1] + " b"), (v.notif[0], v.notif[1] + " b")])
         top.append([])
@@ -455,11 +463,47 @@ def _render_panel(v: View) -> Frame:
     by = footer_start + next(i for i, l in enumerate(footer) if l is buttons)
     if 0 <= by < v.height:
         hits.append(Hit(by, padx + inner - 3, v.width, "menu"))
+    for x0, x1, action in tab_hits:
+        hits.append(Hit(0, padx + x0, padx + x1, action))
+    for x0, x1, action in strip_hits:
+        hits.append(Hit(strip_y, padx + x0, padx + x1, action))
     hits.append(Hit(-1, 0, v.width, "panel"))
 
     if v.menu:
         _overlay_menu(lines, hits, v, sym, padx, inner, bottom=min(by, v.height) if by >= 0 else v.height)
     return Frame(lines, hits)
+
+
+def _tab_bar(v: View, sym, inner: int) -> Tuple[Line, List[Tuple[int, int, str]]]:
+    """`Recap │ Pad` on the first line when the agent's tab has a scratch pad."""
+    if not v.pad_name:
+        return [], []
+    recap, pad_tab = " Recap ", " Pad "
+    left: Line = [(recap, "bg:accent on:accent b"), (" ", ""), (pad_tab, "sub b")]
+    x_pad = width(recap) + 1
+    room = inner - x_pad - width(pad_tab) - 1
+    right: Line = [(truncate(v.pad_name, room, sym["ell"]), "dim")] if room > 3 else []
+    line = _lr(left, right, inner)
+    return line, [(x_pad, inner, "tab:pad")]
+
+
+def _marks_strip(marks: List[Tuple[str, str, str]], inner: int) -> Tuple[Line, List[Tuple[int, int, str]]]:
+    """Clickable chips, one per pad section: `a `s `t 3/7 ... Chips that do not fit are left out."""
+    line: Line = []
+    hits: List[Tuple[int, int, str]] = []
+    x = 0
+    for letter, text, role in marks:
+        chip = "`" + letter + (" " + text if text else "")
+        w = width(chip)
+        if x + w > inner:
+            break
+        line.append((chip, role))
+        hits.append((x, x + w, "mark:" + letter))
+        x += w
+        if x + 2 <= inner:
+            line.append(("  ", ""))
+            x += 2
+    return line, hits
 
 
 def _fit_bg(line: Line, total: int) -> Line:
