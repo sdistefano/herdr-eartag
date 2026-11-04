@@ -65,21 +65,25 @@ class ParseTests(unittest.TestCase):
 
 
 class ChipTests(unittest.TestCase):
-    def test_order_and_roles(self):
+    def test_order_titles_and_roles(self):
         self.assertEqual(
             pad.chips(_pad()),
             [
-                ("a", "", "accent b"),
-                ("i", "", "text"),
-                ("s", "1", "working b"),
-                ("t", "1/4", "text"),
-                ("l", "", "text"),
+                ("a", "read this now · `l", "", "accent b"),
+                ("i", "intro", "", "text"),
+                ("s", "needed from Silvio", "1", "working b"),
+                ("t", "todo", "1/4", "text"),
+                ("l", "action log", "", "text"),
             ],
         )
 
+    def test_title_falls_back_to_the_glossary(self):
+        bare = PAD.replace("## `i intro", "## `i")
+        self.assertEqual(pad.chips(_pad(bare))[1][:2], ("i", "intro"))
+
     def test_quiet_s_is_dimmed(self):
         quiet = PAD.replace("- [?] fork or upstream PR?", "")
-        self.assertIn(("s", "", "dim"), pad.chips(_pad(quiet)))
+        self.assertIn(("s", "needed from Silvio", "", "dim"), pad.chips(_pad(quiet)))
 
     def test_nvim_opens_at_the_line(self):
         argv = pad.nvim_argv(Path("/tmp/x.md"), 27)
@@ -101,14 +105,15 @@ class RenderTests(unittest.TestCase):
         frame = self._frame()
         self.assertFalse([h for h in frame.hits if h.action.startswith(("tab:", "mark:"))])
 
-    def test_chip_hits_cover_their_text(self):
+    def test_each_mark_line_carries_its_title_and_opens_its_section(self):
         frame = self._frame(pad_name="trading:6", marks=pad.chips(_pad()))
         self.assertIn("Recap", self._text(frame.lines[0]))
         marks = [h for h in frame.hits if h.action.startswith("mark:")]
         self.assertEqual([h.action for h in marks], ["mark:a", "mark:i", "mark:s", "mark:t", "mark:l"])
-        row = self._text(frame.lines[marks[0].y])
-        for hit in marks:
-            self.assertEqual(row[hit.x0 : hit.x1].split()[0], "`" + hit.action[5:])
+        rows = {h.action[5:]: self._text(frame.lines[h.y]).split() for h in marks}
+        self.assertEqual(rows["s"][:4], ["`s", "needed", "from", "Silvio"])
+        self.assertEqual(rows["s"][-1], "1")
+        self.assertEqual(rows["t"][-1], "1/4")
 
     def test_pad_tab_hit_is_on_the_tab(self):
         frame = self._frame(pad_name="trading:6", marks=pad.chips(_pad()))

@@ -27,6 +27,8 @@ ASCII = {
     "ell": "...", "more": "...", "point": "-", "session": "~", "reply": "*", "v_done": "v", "v_partial": "~", "v_failed": "x", "v_waiting": "?", "v_working": "~", "working": "*", "blocked": "^", "st_done": "v", "idle": "o", "unknown": "?",
 }
 
+MAX_MARKS = 7  # pad sections listed in the recap
+
 STATUS_ROLES = {"working": "working", "blocked": "blocked", "done": "done", "idle": "idle"}
 
 
@@ -90,7 +92,7 @@ class View:
     menu: Optional[List[Tuple[str, str, str, str]]] = None   # (action, icon, icon_role, label)
     menu_index: int = 0
     pad_name: str = ""                                   # the tab's scratch pad, when there is one
-    marks: List[Tuple[str, str, str]] = field(default_factory=list)  # (letter, text, role)
+    marks: List[Tuple[str, str, str, str]] = field(default_factory=list)  # (letter, title, count, role)
 
 
 @dataclass
@@ -274,11 +276,10 @@ def _render_panel(v: View) -> Frame:
     top: List[Line] = [tabs, _lr(left, badge, inner), []]
     top.append([(sym["rule"] * inner, "rule")])
     top.append([])
-    strip_hits: List[Tuple[int, int, str]] = []
-    strip_y = len(top)
-    if v.marks:
-        strip, strip_hits = _marks_strip(v.marks, inner)
-        top += [strip, []]
+    marks_y = len(top)
+    mark_lines = [_mark_line(m, sym, inner) for m in v.marks[:MAX_MARKS]]
+    if mark_lines:
+        top += mark_lines + [[]]
     if v.notif:
         top.append([(sym["notif"] + " ", v.notif[1] + " b"), (v.notif[0], v.notif[1] + " b")])
         top.append([])
@@ -465,8 +466,8 @@ def _render_panel(v: View) -> Frame:
         hits.append(Hit(by, padx + inner - 3, v.width, "menu"))
     for x0, x1, action in tab_hits:
         hits.append(Hit(0, padx + x0, padx + x1, action))
-    for x0, x1, action in strip_hits:
-        hits.append(Hit(strip_y, padx + x0, padx + x1, action))
+    for i, mark in enumerate(v.marks[:MAX_MARKS]):  # the whole line opens the pad at that mark
+        hits.append(Hit(marks_y + i, 0, v.width, "mark:" + mark[0]))
     hits.append(Hit(-1, 0, v.width, "panel"))
 
     if v.menu:
@@ -487,23 +488,15 @@ def _tab_bar(v: View, sym, inner: int) -> Tuple[Line, List[Tuple[int, int, str]]
     return line, [(x_pad, inner, "tab:pad")]
 
 
-def _marks_strip(marks: List[Tuple[str, str, str]], inner: int) -> Tuple[Line, List[Tuple[int, int, str]]]:
-    """Clickable chips, one per pad section: `a `s `t 3/7 ... Chips that do not fit are left out."""
-    line: Line = []
-    hits: List[Tuple[int, int, str]] = []
-    x = 0
-    for letter, text, role in marks:
-        chip = "`" + letter + (" " + text if text else "")
-        w = width(chip)
-        if x + w > inner:
-            break
-        line.append((chip, role))
-        hits.append((x, x + w, "mark:" + letter))
-        x += w
-        if x + 2 <= inner:
-            line.append(("  ", ""))
-            x += 2
-    return line, hits
+def _mark_line(mark: Tuple[str, str, str, str], sym, inner: int) -> Line:
+    """`s  needed from Silvio          1  : letter, title, count on the right."""
+    letter, title, count, role = mark
+    tag_role = role if role != "dim" else "sub"
+    left: Line = [("`" + letter + "  ", tag_role + (" b" if "b" not in tag_role.split() else ""))]
+    right: Line = [(count, role)] if count else []
+    room = inner - 4 - (len(count) + 1 if count else 0)
+    left.append((truncate(title, room, sym["ell"]), role if role != "accent b" else "accent"))
+    return _lr(left, right, inner)
 
 
 def _fit_bg(line: Line, total: int) -> Line:

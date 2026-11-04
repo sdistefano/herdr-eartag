@@ -204,27 +204,39 @@ def nvim_argv(path: Path, line: Optional[int]) -> List[str]:
     return argv + [str(path)]
 
 
-def chips(pad: Pad) -> List[Tuple[str, str, str]]:
-    """Marks strip of the recap, as (letter, text, role): `a first, then sections in file order.
+def chips(pad: Pad) -> List[Tuple[str, str, str, str]]:
+    """Marks list of the recap, as (letter, title, count, role): `a first, then sections in
+    file order. The title is the section heading, else the glossary's meaning of the letter.
 
     `s lights up when something waits on the user (the section has content, or items are
     `[?]`), `t carries done/total, empty sections are dimmed.
     """
-    out: List[Tuple[str, str, str]] = []
+    out: List[Tuple[str, str, str, str]] = []
     if pad.read_now:
-        out.append(("a", "", "accent b"))
+        out.append(("a", _read_now_title(pad), "", "accent b"))
     waiting = pad.boxes.get("?", 0)
     seen = {"a"} if pad.read_now else set()
     for sec in pad.sections:
         if sec.letter in seen:
             continue
         seen.add(sec.letter)
-        out.append((sec.letter,) + _chip(sec, pad, waiting))
+        title = sec.title or pad.glossary.get(sec.letter, "")
+        out.append((sec.letter, title) + _chip(sec, pad, waiting))
     return out
 
 
+def _read_now_title(pad: Pad) -> str:
+    """`a -> `l:last   read this now  ->  "read this now · `l"."""
+    meaning = pad.glossary.get("a", "")
+    m = _POINTER_RE.match(meaning)
+    if not m:
+        return meaning or "read this now"
+    rest = meaning[m.end() :].strip() or "read this now"
+    return "{} · `{}".format(rest, m.group(1))
+
+
 def _chip(sec: Section, pad: Pad, waiting: int) -> Tuple[str, str]:
-    """Text and role of one section's chip."""
+    """Count and role of one section's line."""
     if sec.letter == "s":
         hot = sec.filled or waiting
         return (str(waiting) if waiting else "", "working b" if hot else "dim")
