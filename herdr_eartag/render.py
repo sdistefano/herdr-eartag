@@ -93,6 +93,7 @@ class View:
     menu_index: int = 0
     pad_name: str = ""                                   # the tab's scratch pad, when there is one
     marks: List[Tuple[str, str, str, str]] = field(default_factory=list)  # (letter, title, count, role)
+    hover_mark: Optional[str] = None                     # letter under the pointer: drawn lit
 
 
 @dataclass
@@ -277,7 +278,7 @@ def _render_panel(v: View) -> Frame:
     top.append([(sym["rule"] * inner, "rule")])
     top.append([])
     marks_y = len(top)
-    mark_lines = [_mark_line(m, sym, inner) for m in v.marks[:MAX_MARKS]]
+    mark_lines = [_mark_line(m, sym, inner, m[0] == v.hover_mark) for m in v.marks[:MAX_MARKS]]
     if mark_lines:
         top += mark_lines + [[]]
     if v.notif:
@@ -488,15 +489,17 @@ def _tab_bar(v: View, sym, inner: int) -> Tuple[Line, List[Tuple[int, int, str]]
     return line, [(x_pad, inner, "tab:pad")]
 
 
-def _mark_line(mark: Tuple[str, str, str, str], sym, inner: int) -> Line:
-    """`s  needed from Silvio          1  : letter, title, count on the right."""
+def _mark_line(mark: Tuple[str, str, str, str], sym, inner: int, lit: bool = False) -> Line:
+    """`s  needed from Silvio          1  : letter, title, count on the right.
+    A `lit` line (under the pointer) gets the tip background, like a hovered gauge's detail."""
     letter, title, count, role = mark
     tag_role = role if role != "dim" else "sub"
     left: Line = [("`" + letter + "  ", tag_role + (" b" if "b" not in tag_role.split() else ""))]
     right: Line = [(count, role)] if count else []
     room = inner - 4 - (len(count) + 1 if count else 0)
     left.append((truncate(title, room, sym["ell"]), role if role != "accent b" else "accent"))
-    return _lr(left, right, inner)
+    line = _lr(left, right, inner)
+    return [(text, (style + " bg:tip").strip()) for text, style in line] if lit else line
 
 
 def _fit_bg(line: Line, total: int) -> Line:

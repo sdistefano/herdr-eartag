@@ -115,6 +115,13 @@ class RenderTests(unittest.TestCase):
         self.assertEqual(rows["s"][-1], "1")
         self.assertEqual(rows["t"][-1], "1/4")
 
+    def test_hovered_mark_line_is_lit_and_only_that_one(self):
+        frame = self._frame(pad_name="trading:6", marks=pad.chips(_pad()), hover_mark="s")
+        ys = {h.action[5:]: h.y for h in frame.hits if h.action.startswith("mark:")}
+        lit = lambda y: any("bg:tip" in style for _, style in frame.lines[y])
+        self.assertTrue(lit(ys["s"]))
+        self.assertFalse(any(lit(ys[k]) for k in "aitl"))
+
     def test_pad_tab_hit_is_on_the_tab(self):
         frame = self._frame(pad_name="trading:6", marks=pad.chips(_pad()))
         hit = next(h for h in frame.hits if h.action == "tab:pad")

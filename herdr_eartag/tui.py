@@ -161,6 +161,7 @@ class App:
         self.overhead = herdr_border_overhead()
         self.pinned_bar: Optional[str] = None
         self.hover_bar: Optional[str] = None
+        self.hover_mark: Optional[str] = None
         self.menu_open = False
         self.menu_index = 0
         self.frame: Optional[Frame] = None
@@ -332,6 +333,10 @@ class App:
             if hover != self.hover_bar:
                 self.hover_bar = hover
                 self.dirty = True
+            mark = action[5:] if action.startswith("mark:") else None
+            if mark != self.hover_mark:
+                self.hover_mark = mark
+                self.dirty = True
             return
         # Act on release: herdr keeps the pointer captured for this pane between press
         # and release, so all slow work must happen after the gesture is over.
@@ -459,6 +464,7 @@ class App:
     def build(self, screen: Screen) -> Frame:
         cols, rows = screen.size()
         view = self.model.view(cols, rows, self.pinned_bar or self.hover_bar)
+        view.hover_mark = self.hover_mark
         if self.menu_open:
             view.menu = self.menu_items()
             view.menu_index = self.menu_index
