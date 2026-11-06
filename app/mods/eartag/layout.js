@@ -29,6 +29,20 @@ export function padMachine(root) {
   return terminal ? splitAddress(terminal).machine : null;
 }
 
+/**
+ * The layout file's tree with the pad block showing `terminal` ("<machine>/eartag-pad"), or
+ * null when nothing needs to change (or the layout has no Eartag column). The app drops a
+ * terminal block from the file when its terminal ends (nvim quit), so the panel puts it back.
+ */
+export function withPadBlock(tree, terminal) {
+  if (!find(tree, COLUMN_ID) || find(tree, PAD_ID)?.content?.terminal === terminal) return null;
+  const copy = structuredClone(tree);
+  const column = find(copy, COLUMN_ID);
+  const block = { id: PAD_ID, type: "block", hidden: true, content: { terminal } };
+  column.children = [...(column.children ?? []).filter((c) => c.id !== PAD_ID), block];
+  return copy;
+}
+
 /** The commands that make the layout show the pad's nvim (show) or the panel alone, as
  *  [name, args] pairs; only what differs from now. */
 export function padSteps(root, show) {

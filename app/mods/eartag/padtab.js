@@ -6,12 +6,12 @@ import { div } from "gpui-kit";
 import { v_flex } from "gpui-base";
 
 /** pad: doc.pad (null while the tab has none). status.starting: "running" | "done" |
- *  { error, detail }; status.nvimError: why nvim could not start; status.offBox: no nvim
- *  block for this agent's machine. */
+ *  { error, detail }; status.nvimError: why nvim could not start; status.offBox: the agent
+ *  runs on this computer (pads and their nvim live on the box). */
 export function padTab(t, pad, status = {}) {
   const failed = status.starting && typeof status.starting === "object";
   const [title, detail, bad] = status.offBox
-    ? ["The pad nvim runs on the box.", "This agent is on another machine.", false]
+    ? ["Pads live on the agent's machine.", "This agent runs on this computer, which has no scratch pads.", false]
     : failed
       ? ["Could not start a scratch pad.", status.starting.detail ?? "", true]
       : !pad

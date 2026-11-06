@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { steps } from "../mods/eartag-key/toggle.js";
-import { agentFor, padMachine, padSteps, splitAddress } from "../mods/eartag/layout.js";
+import { agentFor, padMachine, padSteps, splitAddress, withPadBlock } from "../mods/eartag/layout.js";
 import { effort, gauge, plain, role, status, verdict } from "../mods/eartag/style.js";
 
 const tree = (hidden, active, pad) => ({
@@ -137,4 +137,14 @@ test("effort dots are cool, gold, then red at max", () => {
 
 test("plain drops highlight braces", () => {
   assert.equal(plain("Fix {login} page"), "Fix login page");
+});
+
+test("withPadBlock puts the nvim block back, or points it at another machine", () => {
+  const bare = { id: "root", children: [{ id: "eartag", children: [{ id: "eartag-view" }] }] };
+  const back = withPadBlock(bare, "box/eartag-pad");
+  assert.equal(padMachine(back), "box");
+  assert.equal(withPadBlock(back, "box/eartag-pad"), null); // already right: no write
+  assert.equal(padMachine(withPadBlock(back, "vps/eartag-pad")), "vps");
+  assert.equal(withPadBlock({ id: "root" }, "box/eartag-pad"), null);
+  assert.equal(bare.children[0].children.length, 1); // input untouched
 });

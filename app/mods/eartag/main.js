@@ -8,9 +8,9 @@
 
 import { View, div } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
-import { agents, focused, layout, run, terminals, theme } from "herdr";
+import { agents, appHome, focused, layout, readTextFile, run, shared, theme, writeTextFile } from "herdr";
 import { fetchPanel, startPad } from "./data.js";
-import { COLUMN_ID, agentFor, find, padMachine, padSteps, splitAddress } from "./layout.js";
+import { COLUMN_ID, agentFor, find, padMachine, padSteps, splitAddress, withPadBlock } from "./layout.js";
 import { showPad } from "./nvim.js";
 import { padTab } from "./padtab.js";
 import * as recap from "./recap.js";
@@ -25,9 +25,26 @@ const ERRORS = {
   failed: "Eartag failed on the box",
 };
 
+/** localStorage can be unavailable: then every start shows Recap. */
+function savedTab() {
+  try {
+    return localStorage.getItem("tab") === "pad" ? "pad" : "recap";
+  } catch (_e) {
+    return "recap";
+  }
+}
+
+function saveTab(name) {
+  try {
+    localStorage.setItem("tab", name);
+  } catch (_e) {
+    // not kept: fine
+  }
+}
+
 export default class Eartag extends View {
   init(_p, cx) {
-    this.tab = "recap";
+    this.tab = savedTab(); // the last tab shown survives reloads
     this.address = null; // the agent shown now
     this.lastByTab = {}; // tab -> agent last focused there
     this.results = {}; // address -> { doc, error?, detail?, at, status }
@@ -100,10 +117,10 @@ export default class Eartag extends View {
     const root = layout();
     const pad = this.result()?.doc?.pad;
     const machine = splitAddress(this.address).machine;
-    const onBox = Boolean(machine) && machine === padMachine(root);
-    const wanted = this.tab === "pad" && this.visible() && pad?.nvim && onBox ? pad : null;
+    const wanted = this.tab === "pad" && this.visible() && pad?.nvim && machine ? pad : null;
     if (wanted) this.checkNvim(wanted, machine, cx);
-    const ready = wanted && !this.nvim.error && this.nvim.file === wanted.path;
+    const placed = machine === padMachine(root);
+    const ready = wanted && placed && !this.nvim.error && this.nvim.file === wanted.path;
     for (const [name, args] of padSteps(root, Boolean(ready))) run(name, args);
   }
 
@@ -135,7 +152,7 @@ export default class Eartag extends View {
     if (n.busy || fresh) return;
     n.busy = true;
     cx.spawn(async (cx) => {
-      n.error = await showPad(machine, pad, n.file);
+      n.error = (await showPad(machine, pad, n.file)) ?? (await this.placeBlock(`${machine}/${pad.nvim.name}`));
       n.file = n.error ? null : pad.path;
       n.at = Date.now();
       n.busy = false;
@@ -144,9 +161,24 @@ export default class Eartag extends View {
     });
   }
 
+  /** Put the nvim block (back) in the shown layout's file, for `terminal`. A file edit, not
+   *  layout.set: it keeps the person's clicks. Resolves with an error or null. */
+  async placeBlock(terminal) {
+    const path = `${appHome()}/layouts/${shared("layout")}.json`;
+    try {
+      const text = await readTextFile(path);
+      const tree = text && withPadBlock(JSON.parse(text), terminal);
+      if (tree) await writeTextFile(path, JSON.stringify(tree, null, 2) + "\n", text);
+      return null;
+    } catch (e) {
+      return `could not add the nvim block to the layout: ${e?.message ?? e}`;
+    }
+  }
+
   // -- actions ---------------------------------------------------------------------
   setTab(name, cx) {
     this.tab = name;
+    saveTab(name);
     cx.notify();
     this.syncPad(cx);
   }
@@ -208,7 +240,7 @@ export default class Eartag extends View {
     if (quiet) return quiet;
     if (this.tab === "pad") {
       const machine = splitAddress(this.address).machine;
-      const status = { starting: this.padStarts[this.address], nvimError: this.nvim.error, offBox: machine !== padMachine(layout()) };
+      const status = { starting: this.padStarts[this.address], nvimError: this.nvim.error, offBox: !machine };
       return this.scroll(t, [padTab(t, doc.pad, status)]);
     }
     return this.recapTab(t, doc.view);
