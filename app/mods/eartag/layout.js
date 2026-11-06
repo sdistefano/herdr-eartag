@@ -36,7 +36,7 @@ export function padMachine(root) {
  */
 export function withPadBlock(tree, terminal) {
   if (!find(tree, COLUMN_ID) || find(tree, PAD_ID)?.content?.terminal === terminal) return null;
-  const copy = structuredClone(tree);
+  const copy = JSON.parse(JSON.stringify(tree)); // the mod runtime has no structuredClone
   const column = find(copy, COLUMN_ID);
   const block = { id: PAD_ID, type: "block", hidden: true, content: { terminal } };
   column.children = [...(column.children ?? []).filter((c) => c.id !== PAD_ID), block];

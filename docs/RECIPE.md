@@ -57,6 +57,9 @@ scratch pad, as a real nvim filling the panel.
 
 ## Watch out
 
+- The mod runtime has no `structuredClone` (node has, so tests pass): copy trees with a JSON round trip.
+- The app drops a terminal block from the layout file when its terminal ends; the panel puts it back with a
+  direct file edit (`readTextFile` + `writeTextFile` of `layouts/<shown>.json`), which keeps the clicks.
 - Never `layout.set` at run time: it replaces the file and wipes the layout's clicks (`layouts/.state`), sizes and
   shown panels included. Show, hide and resize only; the nvim block names a terminal, so it never changes.
 - A mod's props come from `props()`, not from `init`'s first argument.
