@@ -1,13 +1,17 @@
 // Pure helpers (no herdr imports, testable with node --test): which agent the panel is
-// about, and the layout edit that shows the pad's nvim under the panel.
+// about, and the click-level layout commands for the Pad tab.
 //
 // The layout holds Eartag like Files and Changes: a child of the right `panel-body` stack,
-//   { id: "eartag", type: "column", children: [ { id: "eartag-view", content: { mod: "eartag" } } ] }
-// and on the Pad tab a terminal block is added under it: { id: "eartag-pad", content: { terminal } }.
+//   { id: "eartag", type: "column", children: [
+//       { id: "eartag-view", content: { mod: "eartag" } },
+//       { id: "eartag-pad", hidden: true, content: { terminal: "<machine>/eartag-pad" } } ] }
+// The Pad tab shows `eartag-pad` (the named nvim, nvim.js) and shrinks the panel to its tab
+// bar; Recap hides it again. Only show/hide/resize: `layout.set` would wipe the person's clicks.
 
 export const COLUMN_ID = "eartag";
+export const VIEW_ID = "eartag-view";
 export const PAD_ID = "eartag-pad";
-const PAD_WEIGHT = 3; // nvim gets three shares, the marks list one
+export const TABBAR_PX = 31; // the panel's tab bar (30) and its border
 
 /** The node with `id` in a layout tree, or null. */
 export function find(node, id) {
@@ -19,20 +23,23 @@ export function find(node, id) {
   return null;
 }
 
-/** The terminal the pad block shows now, or null when there is none. */
-export function padTerminal(root) {
-  return find(root, PAD_ID)?.content?.terminal ?? null;
+/** The machine whose nvim the layout's pad block shows, or null (no block). */
+export function padMachine(root) {
+  const terminal = find(root, PAD_ID)?.content?.terminal;
+  return terminal ? splitAddress(terminal).machine : null;
 }
 
-/** A copy of the tree whose Eartag column shows `terminal` under the panel (null: no pad
- *  block). Returns null when the layout has no Eartag column (nothing to edit). */
-export function withPad(root, terminal) {
-  if (!find(root, COLUMN_ID)) return null;
-  const copy = structuredClone(root);
-  const column = find(copy, COLUMN_ID);
-  column.children = (column.children ?? []).filter((c) => c.id !== PAD_ID);
-  if (terminal) column.children.push({ id: PAD_ID, type: "block", content: { terminal }, size: { weight: PAD_WEIGHT } });
-  return copy;
+/** The commands that make the layout show the pad's nvim (show) or the panel alone, as
+ *  [name, args] pairs; only what differs from now. */
+export function padSteps(root, show) {
+  const pad = find(root, PAD_ID);
+  const view = find(root, VIEW_ID);
+  if (!pad || !view) return [];
+  const steps = [];
+  if (Boolean(pad.hidden) === show) steps.push([show ? "layout.show" : "layout.hide", { id: PAD_ID }]);
+  const shrunk = view.size?.px === TABBAR_PX;
+  if (shrunk !== show) steps.push(["layout.resize", show ? { id: VIEW_ID, px: TABBAR_PX } : { id: VIEW_ID, weight: 1 }]);
+  return steps;
 }
 
 /**

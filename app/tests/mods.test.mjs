@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { steps } from "../mods/eartag-key/toggle.js";
-import { agentFor, padTerminal, splitAddress, withPad } from "../mods/eartag/layout.js";
+import { agentFor, padMachine, padSteps, splitAddress } from "../mods/eartag/layout.js";
 import { effort, gauge, plain, role, status, verdict } from "../mods/eartag/style.js";
 
 const tree = (hidden, active, pad) => ({
@@ -45,14 +45,37 @@ test("Alt+I does nothing in a layout without Eartag", () => {
   assert.deepEqual(steps({ id: "root", children: [] }), []);
 });
 
-test("withPad adds, swaps and removes the nvim block without touching the input", () => {
-  const root = tree(false, "eartag");
-  const one = withPad(root, "box/t30");
-  assert.equal(padTerminal(one), "box/t30");
-  assert.equal(padTerminal(root), null);
-  assert.equal(padTerminal(withPad(one, "box/t31")), "box/t31");
-  assert.equal(padTerminal(withPad(one, null)), null);
-  assert.equal(withPad({ id: "root" }, "box/t30"), null);
+const column = (padHidden, viewSize) => ({
+  id: "eartag",
+  children: [
+    { id: "eartag-view", size: viewSize },
+    { id: "eartag-pad", hidden: padHidden, content: { terminal: "box/eartag-pad" } },
+  ],
+});
+
+test("Pad shows the nvim block and shrinks the panel to its tab bar", () => {
+  assert.deepEqual(padSteps(column(true, undefined), true), [
+    ["layout.show", { id: "eartag-pad" }],
+    ["layout.resize", { id: "eartag-view", px: 31 }],
+  ]);
+});
+
+test("Recap hides it and gives the panel its room back", () => {
+  assert.deepEqual(padSteps(column(false, { px: 31 }), false), [
+    ["layout.hide", { id: "eartag-pad" }],
+    ["layout.resize", { id: "eartag-view", weight: 1 }],
+  ]);
+});
+
+test("nothing to do when the layout already matches, or has no pad block", () => {
+  assert.deepEqual(padSteps(column(false, { px: 31 }), true), []);
+  assert.deepEqual(padSteps(column(true, { weight: 1 }), false), []);
+  assert.deepEqual(padSteps({ id: "root" }, true), []);
+});
+
+test("padMachine reads the block's machine", () => {
+  assert.equal(padMachine(column(true)), "box");
+  assert.equal(padMachine({ id: "root" }), null);
 });
 
 const A = [

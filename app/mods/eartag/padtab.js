@@ -1,62 +1,26 @@
-// The Pad tab: the tab's scratch pad, one line per ` mark with its title. The whole line is
-// clickable and lights up on hover; a click moves the real nvim under the panel (nvim.js) to
-// that mark's line. The panel itself never writes a pad: editing happens in that nvim.
+// The Pad tab's own text, for when there is no nvim to show: the pad is being started, could
+// not be, or the agent is not on the machine the layout's nvim block shows. Otherwise the
+// panel shrinks to its tab bar and the real nvim on the pad fills it (nvim.js, layout.js).
 
 import { div } from "gpui-kit";
-import { h_flex, v_flex } from "gpui-base";
-import { heading } from "./recap.js";
-import { role } from "./style.js";
+import { v_flex } from "gpui-base";
 
-/** pad: doc.pad (null while the tab has none); onOpen(mark) jumps nvim there.
- *  status.starting: the pad being created ("running"), or why it could not be ({ error, detail });
- *  status.nvimError: why nvim could not start, if it could not. */
-export function padTab(t, pad, onOpen, status = {}) {
-  if (!pad) return noPad(t, status.starting);
-  const error = status.nvimError;
-  const todo = pad.todo ? `☐ ${pad.todo.done}/${pad.todo.total}` : "";
-  return v_flex()
-    .gap(6)
-    .child(heading(t, pad.name, todo))
-    .when(!pad.marks.length, (el) => el.child(div().text_color(t.dim).child("No ` marks in this pad yet.")))
-    .child(v_flex().gap(1).children(pad.marks.map((m) => markRow(t, m, onOpen))))
-    .when(Boolean(error), (el) => el.child(div().text_size(11.5).text_color(t.blocked).child(error)));
-}
-
-/** No pad yet: it is being started (main.js does it once per agent), or it could not be. */
-function noPad(t, starting) {
-  const failed = starting && starting !== "running" && starting !== "done";
-  const [title, detail] = failed
-    ? ["Could not start a scratch pad.", starting.detail ?? ""]
-    : ["Starting a scratch pad for this tab…", ""];
+/** pad: doc.pad (null while the tab has none). status.starting: "running" | "done" |
+ *  { error, detail }; status.nvimError: why nvim could not start; status.offBox: no nvim
+ *  block for this agent's machine. */
+export function padTab(t, pad, status = {}) {
+  const failed = status.starting && typeof status.starting === "object";
+  const [title, detail, bad] = status.offBox
+    ? ["The pad nvim runs on the box.", "This agent is on another machine.", false]
+    : failed
+      ? ["Could not start a scratch pad.", status.starting.detail ?? "", true]
+      : !pad
+        ? ["Starting a scratch pad for this tab…", "", false]
+        : status.nvimError
+          ? ["Could not open nvim on the pad.", status.nvimError, true]
+          : ["Opening nvim…", pad.path, false];
   return v_flex()
     .gap(4)
-    .child(div().text_color(failed ? t.blocked : t.muted).child(title))
+    .child(div().text_color(bad ? t.blocked : t.muted).child(title))
     .when(Boolean(detail), (el) => el.child(div().text_size(11.5).text_color(t.dim).whitespace_normal().child(detail)));
-}
-
-function markRow(t, m, onOpen) {
-  const look = role(t, m.role);
-  return h_flex()
-    .id(`mark-${m.letter}`)
-    .gap(8)
-    .px(6)
-    .py(4)
-    .rounded(5)
-    .items_center()
-    .cursor_pointer()
-    .hover((s) => s.bg(t.hover))
-    .on_click((_e, cx) => {
-      cx.stop_propagation();
-      onOpen(m);
-    })
-    .child(div().flex_none().w(18).font_semibold().text_color(look.color).child("`" + m.letter))
-    .child(
-      div()
-        .flex_1()
-        .truncate()
-        .text_color(look.color)
-        .when(look.bold, (el) => el.font_semibold())
-        .child(m.title || "—"),
-    )
-    .when(Boolean(m.count), (el) => el.child(div().flex_none().text_size(11).text_color(t.muted).child(m.count)));
 }

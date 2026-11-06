@@ -296,7 +296,8 @@ class PayloadTests(unittest.TestCase):
         other = payload.pad_data(
             pad.parse(PAD_TEXT, Path("/var/scratchpad/other:2.md"))
         )
-        self.assertNotEqual(nvim["socket"], other["nvim"]["socket"])  # one nvim per pad
+        self.assertEqual(nvim["socket"], other["nvim"]["socket"])  # one nvim per machine
+        self.assertEqual(nvim["name"], "eartag-pad")
 
     def test_no_pad_is_null(self):
         self.assertIsNone(payload.pad_data(None))

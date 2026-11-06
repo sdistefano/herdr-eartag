@@ -13,7 +13,6 @@ document is printed, for a later run to pick up.
 from __future__ import annotations
 
 import dataclasses
-import hashlib
 import os
 import sys
 import tempfile
@@ -27,6 +26,8 @@ from .render import View
 from .summarize import Summarizer
 
 SCHEMA = 1
+NVIM_NAME = "eartag-pad"  # the app's pad nvim terminal (its layout block names it)
+NVIM_SOCKET = str(Path(tempfile.gettempdir()) / "eartag-pad-nvim.sock")
 CLAIM_TTL = (
     120.0  # a claim older than this was left by a warmer that died: take it over
 )
@@ -105,13 +106,14 @@ def pad_data(pad: Optional[padmod.Pad]) -> Optional[Dict[str, Any]]:
 
 
 def app_nvim(path: Path) -> Dict[str, Any]:
-    """How the app starts its own nvim on the pad: argv, and the socket it sends mark
-    jumps to (`nvim --server <socket> --remote-send`). One socket per pad path."""
-    digest = hashlib.sha1(str(path).encode("utf-8")).hexdigest()[:12]
-    socket = str(Path(tempfile.gettempdir()) / "eartag-nvim-{}.sock".format(digest))
+    """How the app runs its nvim on the pad: one nvim per machine, a herdr-core terminal named
+    `name` that the layout shows by name, driven through `socket` (`nvim --server <socket>
+    --remote-send`: a mark jump, or `:edit` another agent's pad). argv opens this pad.
+    """
     return {
-        "argv": padmod.nvim_argv(path, None, tabbar=False, listen=socket),
-        "socket": socket,
+        "argv": padmod.nvim_argv(path, None, tabbar=False, listen=NVIM_SOCKET),
+        "socket": NVIM_SOCKET,
+        "name": NVIM_NAME,
     }
 
 
