@@ -36,11 +36,12 @@ async function start(machine, pad) {
   }
 }
 
-/** The named nvim shows `pad` on `machine`: started, or told to open it (saving the pad it
- *  had open first). `current` is the path it showed last. Resolves with an error or null. */
+/** The named nvim shows `pad` on `machine`: started, or told to open it (EartagOpen saves
+ *  the pad it had open first and wipes it, so buffers never pile up). `current` is the path it showed last. Resolves with an error or null. */
 export async function showPad(machine, pad, current) {
   if (!(await live(machine, pad.nvim.name))) return (await start(machine, pad)) ? null : "nvim did not start on the box";
   if (current === pad.path) return null;
-  const path = pad.path.replace(/ /g, "\\ ");
-  return (await send(machine, pad, `<C-\\><C-N>:update | edit ${path}<CR>`)) ? null : "nvim did not answer";
+  // EartagOpen (pad_app.lua): save, open, wipe the other buffers.
+  const keys = `<C-\\><C-N><Cmd>lua EartagOpen([[${pad.path}]])<CR>`;
+  return (await send(machine, pad, keys)) ? null : "nvim did not answer";
 }

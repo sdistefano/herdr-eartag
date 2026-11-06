@@ -22,6 +22,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 RESOLVE_TTL = 30.0  # herdr may renumber tab ids after a close: resolve again now and then
 TABBAR_LUA = Path(__file__).with_name("pad_tabbar.lua")
+APP_LUA = Path(__file__).with_name("pad_app.lua")  # the Herdr app panel's nvim: bare, one buffer
 RELOAD_VIM = Path(os.path.expanduser("~")) / ".cache" / "herdr-scratch" / "reload.vim"
 
 _HEADING_RE = re.compile(r"^#{2,6}\s+`([a-z])\b\s*(.*)$")
@@ -208,8 +209,7 @@ def nvim_argv(path: Path, line: Optional[int], tabbar: bool = True, listen: Opti
         argv += ["--listen", listen]
     if RELOAD_VIM.exists():
         argv += ["-S", str(RELOAD_VIM)]
-    if tabbar:
-        argv += ["-S", str(TABBAR_LUA)]
+    argv += ["-S", str(TABBAR_LUA if tabbar else APP_LUA)]
     if line:
         argv.append("+{}".format(line))
     return argv + [str(path)]

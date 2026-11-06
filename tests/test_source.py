@@ -291,12 +291,19 @@ class PayloadTests(unittest.TestCase):
         self.assertNotIn(
             str(pad.TABBAR_LUA), nvim["argv"]
         )  # the app draws its own tab bar
+        app_lua = nvim["argv"].index(
+            str(pad.APP_LUA)
+        )  # one file, no tabline or numbers
+        self.assertEqual(nvim["argv"][app_lua - 1], "-S")
+        self.assertTrue(pad.APP_LUA.exists())
         listen = nvim["argv"].index("--listen")
         self.assertEqual(nvim["argv"][listen + 1], nvim["socket"])
         other = payload.pad_data(
             pad.parse(PAD_TEXT, Path("/var/scratchpad/other:2.md"))
         )
-        self.assertEqual(nvim["socket"], other["nvim"]["socket"])  # one nvim per machine
+        self.assertEqual(
+            nvim["socket"], other["nvim"]["socket"]
+        )  # one nvim per machine
         self.assertEqual(nvim["name"], "eartag-pad")
 
     def test_no_pad_is_null(self):
