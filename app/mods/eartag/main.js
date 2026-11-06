@@ -107,6 +107,27 @@ export default class Eartag extends View {
     for (const [name, args] of padSteps(root, Boolean(ready))) run(name, args);
   }
 
+  /** On the Pad tab, an agent whose tab has no pad gets one (once; a failure is shown). */
+  ensurePad(cx) {
+    const address = this.address;
+    const doc = this.result()?.doc;
+    if (this.tab !== "pad" || !doc || doc.pad || !this.visible() || this.padStarts[address]) return;
+    this.padStarts[address] = "running";
+    cx.notify();
+    cx.spawn(async (cx) => {
+      const started = await startPad(address);
+      this.padStarts[address] = started.error ? started : "done";
+      cx.notify();
+      if (!started.error) this.refreshNow(address, cx);
+    });
+  }
+
+  /** Fetch again at once, even if the last fetch is recent. */
+  refreshNow(address, cx) {
+    if (this.results[address]) this.results[address].at = 0;
+    if (address === this.address) this.refresh(cx);
+  }
+
   /** Start the nvim or point it at this pad, when the pad changed or now and then. */
   checkNvim(pad, machine, cx) {
     const n = this.nvim;
