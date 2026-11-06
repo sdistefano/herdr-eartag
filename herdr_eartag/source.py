@@ -109,6 +109,24 @@ class CoreSource:
         out = out.strip()
         return Path(out) if code == 0 and out else None
 
+    def start_pad(self, pane: dict, session_id: Optional[str]) -> Optional[Path]:
+        """Create the terminal's pad when it has none, without opening a pane (the app
+        shows its own nvim). With the agent's session id this is what the SessionStart hook
+        does (`scratch --set-session`: line 1 binds the pad to that session); without one,
+        `scratch --seed`. Returns the pad path, or None when no pad can resolve (exit 3:
+        the terminal has no `where` label yet)."""
+        env = {"HC_TERMINAL_ID": str(pane.get("pane_id") or ""), "SCRATCH_GUARD": "off"}
+        argv = (
+            ["scratch", "--set-session", session_id]
+            if session_id
+            else ["scratch", "--seed"]
+        )
+        try:
+            code, _ = self.run(argv, env=env)
+        except (OSError, subprocess.SubprocessError):
+            return None
+        return self.pad_path(pane) if code == 0 else None
+
     def scratch_available(self) -> bool:
         return shutil.which("scratch", path=tool_path()) is not None
 

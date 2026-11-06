@@ -326,6 +326,30 @@ def cmd_json(args) -> int:
     return 0
 
 
+def cmd_pad_start(args) -> int:
+    """Create the pad of a herdr-core terminal's tab if it has none (the app's Pad tab).
+    Prints {"path": ...}; exit 3 with {"error": ...} when no pad can resolve."""
+    from .source import CoreSource
+
+    src = CoreSource()
+    pane = src.pane(args.terminal)
+    if pane is None:
+        return _json_out({"error": "no_terminal"}, 3)
+    existing = src.pad_path(pane)
+    if existing and existing.exists():
+        return _json_out({"path": str(existing), "created": False}, 0)
+    session = (pane.get("agent_session") or {}).get("value")
+    path = src.start_pad(pane, session)
+    if path is None:
+        return _json_out({"error": "no_pad", "detail": "scratch could not resolve a pad for this tab"}, 3)
+    return _json_out({"path": str(path), "created": True}, 0)
+
+
+def _json_out(doc: dict, code: int) -> int:
+    sys.stdout.write(json.dumps(doc) + "\n")
+    return code
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="eartag.py", description="herdr eartag panel")
     sub = parser.add_subparsers(dest="cmd")
@@ -363,6 +387,9 @@ def main(argv=None) -> int:
     p.add_argument("--width", type=int, help="columns the text is fitted to (default: config width)")
     p.add_argument("--lang")
     p.set_defaults(func=cmd_json)
+    p = sub.add_parser("pad-start", help="create the pad of a herdr-core terminal's tab if it has none")
+    p.add_argument("--terminal", required=True)
+    p.set_defaults(func=cmd_pad_start)
     args = parser.parse_args(argv)
     if not getattr(args, "func", None):
         parser.print_help()

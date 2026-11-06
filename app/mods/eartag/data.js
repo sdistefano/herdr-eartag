@@ -28,3 +28,15 @@ export async function fetchPanel(address) {
 }
 
 const lastLine = (text) => String(text ?? "").trim().split("\n").pop() || "exit code without output";
+
+/** Create the agent's tab pad (`eartag.py pad-start`): { path } or { error, detail }. */
+export async function startPad(address) {
+  const { machine, local } = splitAddress(address);
+  try {
+    const r = await exec("python3", [SCRIPT, "pad-start", "--terminal", local], { on: machine });
+    const out = JSON.parse(r.stdout || "{}");
+    return out.path ? { path: out.path } : { error: out.error ?? "failed", detail: out.detail ?? lastLine(r.stderr) };
+  } catch (e) {
+    return { error: "unreachable", detail: String(e?.message ?? e) };
+  }
+}

@@ -7,15 +7,12 @@ import { h_flex, v_flex } from "gpui-base";
 import { heading } from "./recap.js";
 import { role } from "./style.js";
 
-/** pad: doc.pad (null when `scratch --path` resolved none); onOpen(mark) jumps nvim there;
- *  error: why nvim could not start, if it could not. */
-export function padTab(t, pad, onOpen, error) {
-  if (!pad) {
-    return v_flex()
-      .gap(4)
-      .child(div().text_color(t.muted).child("No scratch pad for this tab."))
-      .child(div().text_size(11.5).text_color(t.dim).whitespace_normal().child("`scratch` starts one in the agent's tab."));
-  }
+/** pad: doc.pad (null while the tab has none); onOpen(mark) jumps nvim there.
+ *  status.starting: the pad being created ("running"), or why it could not be ({ error, detail });
+ *  status.nvimError: why nvim could not start, if it could not. */
+export function padTab(t, pad, onOpen, status = {}) {
+  if (!pad) return noPad(t, status.starting);
+  const error = status.nvimError;
   const todo = pad.todo ? `☐ ${pad.todo.done}/${pad.todo.total}` : "";
   return v_flex()
     .gap(6)
@@ -23,6 +20,18 @@ export function padTab(t, pad, onOpen, error) {
     .when(!pad.marks.length, (el) => el.child(div().text_color(t.dim).child("No ` marks in this pad yet.")))
     .child(v_flex().gap(1).children(pad.marks.map((m) => markRow(t, m, onOpen))))
     .when(Boolean(error), (el) => el.child(div().text_size(11.5).text_color(t.blocked).child(error)));
+}
+
+/** No pad yet: it is being started (main.js does it once per agent), or it could not be. */
+function noPad(t, starting) {
+  const failed = starting && starting !== "running" && starting !== "done";
+  const [title, detail] = failed
+    ? ["Could not start a scratch pad.", starting.detail ?? ""]
+    : ["Starting a scratch pad for this tab…", ""];
+  return v_flex()
+    .gap(4)
+    .child(div().text_color(failed ? t.blocked : t.muted).child(title))
+    .when(Boolean(detail), (el) => el.child(div().text_size(11.5).text_color(t.dim).whitespace_normal().child(detail)));
 }
 
 function markRow(t, m, onOpen) {

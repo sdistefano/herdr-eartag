@@ -9,7 +9,7 @@
 import { View, div } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
 import { agents, focused, layout, run, terminals, theme } from "herdr";
-import { fetchPanel } from "./data.js";
+import { fetchPanel, startPad } from "./data.js";
 import { COLUMN_ID, agentFor, find, padTerminal, splitAddress, withPad } from "./layout.js";
 import { alive, jump, startNvim, stopNvim } from "./nvim.js";
 import { padTab } from "./padtab.js";
@@ -33,6 +33,7 @@ export default class Eartag extends View {
     this.busy = new Set(); // addresses being fetched
     this.nvims = {}; // pad path -> nvim terminal address
     this.starting = false;
+    this.padStarts = {}; // address -> "running" | { error, detail }: one try per agent
     this.hoverBar = null;
     this.tick(cx);
     cx.timer.every(TICK_MS, (cx) => this.tick(cx));
@@ -98,12 +99,34 @@ export default class Eartag extends View {
   // -- the pad's nvim --------------------------------------------------------------
   /** On the Pad tab, the layout shows this pad's nvim under the panel; else no nvim block. */
   syncPad(cx) {
+    this.ensurePad(cx);
     const pad = this.result()?.doc?.pad;
     const wanted = this.tab === "pad" && pad?.nvim && this.visible() ? pad : null;
     const nvim = wanted ? this.nvims[wanted.path] : null;
     if (wanted && this.result()?.padError) return this.showNvim(null); // don't retry every tick
     if (wanted && !alive(terminals(), nvim)) return this.start(wanted, cx);
     this.showNvim(nvim ?? null);
+  }
+
+  /** On the Pad tab, an agent whose tab has no pad gets one (once; a failure is shown). */
+  ensurePad(cx) {
+    const address = this.address;
+    const doc = this.result()?.doc;
+    if (this.tab !== "pad" || !doc || doc.pad || !this.visible() || this.padStarts[address]) return;
+    this.padStarts[address] = "running";
+    cx.notify();
+    cx.spawn(async (cx) => {
+      const started = await startPad(address);
+      this.padStarts[address] = started.error ? started : "done";
+      cx.notify();
+      if (!started.error) this.refreshNow(address, cx);
+    });
+  }
+
+  /** Fetch again at once, even if the last fetch is recent. */
+  refreshNow(address, cx) {
+    if (this.results[address]) this.results[address].at = 0;
+    if (address === this.address) this.refresh(cx);
   }
 
   start(pad, cx) {
@@ -196,7 +219,10 @@ export default class Eartag extends View {
   body(t, doc) {
     const quiet = this.quietState(t, doc);
     if (quiet) return quiet;
-    if (this.tab === "pad") return this.scroll(t, [padTab(t, doc.pad, (m) => this.openMark(m), this.result()?.padError)]);
+    if (this.tab === "pad") {
+      const status = { starting: this.padStarts[this.address], nvimError: this.result()?.padError };
+      return this.scroll(t, [padTab(t, doc.pad, (m) => this.openMark(m), status)]);
+    }
     return this.recapTab(t, doc.view);
   }
 

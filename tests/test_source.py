@@ -130,6 +130,32 @@ class CoreSourceTests(unittest.TestCase):
         run = FakeRunner({("scratch", "--path"): (3, "")})
         self.assertIsNone(source.CoreSource(run=run).pad_path({"pane_id": "t2"}))
 
+    def test_start_pad_binds_it_to_the_agent_session(self):
+        run = FakeRunner(
+            {
+                ("scratch", "--set-session"): (0, ""),
+                ("scratch", "--path"): (0, "/var/scratchpad/hc-gaucho:2.md\n"),
+            }
+        )
+        found = source.CoreSource(run=run).start_pad({"pane_id": "t18"}, "f369")
+        self.assertEqual(found, Path("/var/scratchpad/hc-gaucho:2.md"))
+        argv, env = run.calls[0]
+        self.assertEqual(argv, ["scratch", "--set-session", "f369"])
+        self.assertEqual(env["HC_TERMINAL_ID"], "t18")
+
+    def test_start_pad_without_a_session_seeds_it(self):
+        run = FakeRunner(
+            {("scratch", "--seed"): (0, ""), ("scratch", "--path"): (0, "/p.md\n")}
+        )
+        source.CoreSource(run=run).start_pad({"pane_id": "t18"}, None)
+        self.assertEqual(run.calls[0][0], ["scratch", "--seed"])
+
+    def test_start_pad_reports_none_when_no_pad_can_resolve(self):
+        run = FakeRunner({("scratch",): (3, "")})
+        self.assertIsNone(
+            source.CoreSource(run=run).start_pad({"pane_id": "t18"}, "f369")
+        )
+
     def test_tool_path_adds_box_bin_folders(self):
         with mock.patch.dict(os.environ, {"PATH": "/usr/bin"}):
             path = source.tool_path()
