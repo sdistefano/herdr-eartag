@@ -50,20 +50,30 @@ export function notif(t, v, live) {
   return div().text_size(12).font_medium().text_color(role(t, v.notif.role).color).child(v.notif.text);
 }
 
-/** Now / last ask: the ask, the tool running, the reply with its verdict, task progress. */
+/** Now / last ask: the ask (with its verdict when rephrasing gave one), the tool running,
+ *  task progress. The agent's reply itself is left out: it is right there in the agent pane. */
 export function main(t, v, live) {
   if (v.main_kind === "none") {
     return v_flex().gap(2).children((v.message_lines ?? []).map((line) => div().text_color(t.muted).child(line)));
   }
   return v_flex()
     .gap(6)
-    .child(heading(t, v.main_title, v.main_right))
+    .child(askHeading(t, v))
     .when(Boolean(v.session_title), (el) => el.child(div().text_size(11.5).text_color(t.muted).truncate().child(v.session_title)))
     .child(div().text_size(13).text_color(t.foreground).whitespace_normal().child(plain(v.ask)))
     .children((v.ask_points ?? []).map((p) => div().text_color(t.muted).child("· " + plain(p))))
     .when(Boolean(v.activity), (el) => el.child(activity(t, v, live)))
-    .when(Boolean(v.tasks), (el) => el.child(tasks(t, v.tasks)))
-    .when(Boolean(v.reply), (el) => el.child(reply(t, v)));
+    .when(Boolean(v.tasks), (el) => el.child(tasks(t, v.tasks)));
+}
+
+/** NOW / LAST ASK, its verdict chip, and how long ago it was asked. */
+function askHeading(t, v) {
+  const tag = verdict(t, v.reply_verdict);
+  return h_flex()
+    .gap(6)
+    .items_center()
+    .child(div().flex_1().child(heading(t, v.main_title, v.main_right)))
+    .when(Boolean(tag), (el) => el.child(chip(t, tag.label, tag.color)));
 }
 
 function activity(t, v, live) {
@@ -93,20 +103,6 @@ function tasks(t, k) {
     .child(track(t, pct, t.accent));
 }
 
-function reply(t, v) {
-  const tag = verdict(t, v.reply_verdict);
-  return v_flex()
-    .gap(4)
-    .pt(2)
-    .child(
-      h_flex()
-        .gap(6)
-        .items_center()
-        .child(heading(t, v.reply_label))
-        .when(Boolean(tag), (el) => el.child(chip(t, tag.label, tag.color))),
-    )
-    .child(div().text_size(12).text_color(t.muted).whitespace_normal().child(plain(v.reply)));
-}
 
 /** Three previous asks, each with its outcome glyph when rephrasing gave one. */
 export function before(t, v) {

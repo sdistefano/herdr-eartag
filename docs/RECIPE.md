@@ -1,8 +1,8 @@
 # Eartag
 
-A pane on the right of an agent pane that tells you at a glance what the conversation is about, what you last asked,
+A side panel, next to Files and Changes, about the agent you focus. It tells you at a glance what the conversation is about, what you last asked,
 what the agent did and whether it is done, plus context and quotas left; a second tab lists the tab's scratch pad
-marks and opens the pad in nvim at the one you click.
+marks above a real nvim on that pad.
 
 ![Eartag](app-done.png)
 
@@ -24,34 +24,40 @@ marks and opens the pad in nvim at the one you click.
     line with its detail (reset time), so nothing moves.
 - **Pad**: pad name + `☐ done/total`, then one row per mark: `` `x `` (18px wide) and its title, colored by role
   (`a` accent bold, `s` working bold when something waits on you, empty sections `dim`), count on the right.
-  Whole row clickable, `hover` background.
+  Whole row clickable, `hover` background. Under the list (3 shares to its 1): a terminal block with nvim on the
+  pad, on the agent's machine; a mark click moves its cursor to that line.
 
 ## How it behaves
 
-- Alt+I (`eartag-key.toggle`) on an agent pane splits the panel to the right (50/50: herdr gives no size for a split);
-  again on the agent or inside the panel closes it. Each agent gets its own panel.
+- Alt+I (`eartag-key.toggle`): `layout.select {stack: "panel-body", child: "eartag"}` + `layout.show {id: "panel"}`,
+  or `layout.hide {id: "panel"}` when Eartag already shows. The panel shows the focused agent; focusing a shell or
+  the pad's nvim keeps the agent last focused in that tab; a tab never focused shows its first agent.
 - Status is live from `agents()`. The document is fetched every 3 s while the agent works or right after its status
-  changes, else every 15 s (timers run while hidden).
-- A pad row click: `pane.split {direction: "down", pane: <panel>, argv: ["nvim", "+<line>", <pad>]}`, on the
-  agent's machine; editable; closes when nvim exits.
+  changes, else every 15 s, and only while the panel shows.
+- Pad tab: `hc run --on <machine> --bg --no-parent --rm -- nvim --listen <socket> <pad>` (argv and socket come in
+  the JSON), then `layout.set` adds `{id: "eartag-pad", content: {terminal}}` under the panel; Recap removes it (nvim
+  keeps running for next time). A mark click: `nvim --server <socket> --remote-send "<C-\><C-N>:<line><CR>zt"` on
+  that machine. An nvim that exited is started again.
 - Box unreachable / eartag failing: a quiet message, or the last document flagged "stale". Never a crash.
 
 ## Built from
 
-- `mods/eartag` (`place: none`): `main.js` (view, polling), `data.js` (`exec("python3",
-  ["proj/herdr-eartag/eartag.py", "json", "--terminal", tN], {on: machine})`), `recap.js`, `padtab.js`, `style.js`.
-  Props: `{ terminal: "<machine>/tN" }`.
+- Layout: the `eartag` column (`eartag-view` block, mod `eartag`) in the `panel-body` stack of the right `panel`
+  column, beside `files` and `changes`.
+- `mods/eartag` (`place: none`): `main.js` (view, polling, focus), `layout.js` (pure: which agent, the nvim block
+  edit), `data.js` (`exec("python3", ["proj/herdr-eartag/eartag.py", "json", "--terminal", tN], {on: machine})`),
+  `nvim.js`, `recap.js`, `padtab.js`, `style.js`.
 - `mods/eartag-key` (`place: none`, a 1px block in the layout, draws nothing): receives `eartag-key.toggle`, decides
-  with `toggle.js` (pure), keeps `shared("eartag.panels")` = `{terminal: panel pane id}`.
+  with `toggle.js` (pure). Adds `eartag` to `shared("workspace.panels")`, or the tab bar closes it on a space switch.
 - Box side: `eartag.py json` = `PanelModel` with `source.CoreSource` (`hc get tN --json` +
   `~/.claude/sessions/<pid>.json`; pad from `HC_TERMINAL_ID=tN SCRATCH_GUARD=off scratch --path`), serialized by
   `payload.py`.
 
 ## Watch out
 
-- `panes()` gives no props for mod panes: the registry is how a panel is found again. The pane id of a split on
-  another machine can reach `panes()` a moment later; eartag-key retries for 1.5 s.
-- A pane mod's props come from `props()`, not from `init`'s first argument.
+- A mod's props come from `props()`, not from `init`'s first argument.
+- `hc send` pastes and presses Enter: never use it to drive nvim; use its `--listen` socket.
+- `herdr-app shot` can return a frame minutes old: don't trust it to confirm a change.
 - `exec` on the box may lack `~/.local/bin` (hc) and `~/.bin` (scratch) on PATH; `eartag.py` adds them itself.
 - Verdict chips come from rephrasing (`summarize` in the eartag config). With it off you get status and "your turn"
   only, as in the TUI. `json` never waits for rephrasing: a detached child fills the cache for the next run.
@@ -59,6 +65,6 @@ marks and opens the pad in nvim at the one you click.
 ## Done when
 
 - `python3 eartag.py json --terminal t2` on the box prints the document in well under a second.
-- Alt+I opens the panel right of the agent, Alt+I closes it; another agent in another tab gets its own.
-- Status and verdict change while the agent works; clicking `` `s `` opens nvim at that heading.
+- Alt+I shows the panel with the focused agent, Alt+I hides it; focusing an agent in another tab switches it.
+- Status and verdict change while the agent works; on Pad, nvim opens under the marks and clicking `` `s `` moves it to that heading.
 - `herdr-app check` passes for both mods; `node --test app/tests/` and the Python tests pass.

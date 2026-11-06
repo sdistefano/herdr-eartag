@@ -199,13 +199,17 @@ def resolve(pane: dict) -> Optional[Path]:
     return Path(out) if proc.returncode == 0 and out else None
 
 
-def nvim_argv(path: Path, line: Optional[int]) -> List[str]:
+def nvim_argv(path: Path, line: Optional[int], tabbar: bool = True, listen: Optional[str] = None) -> List[str]:
     """nvim on the pad with the same live reload and keys as the scratch pane, plus the
-    panel's tab bar; `+line` puts the cursor on the mark that was clicked."""
+    panel's tab bar (the TUI; the Herdr app draws its own); `+line` puts the cursor on the
+    mark that was clicked; `listen`: a socket the app drives it through (mark jumps)."""
     argv = ["nvim"]
+    if listen:
+        argv += ["--listen", listen]
     if RELOAD_VIM.exists():
         argv += ["-S", str(RELOAD_VIM)]
-    argv += ["-S", str(TABBAR_LUA)]
+    if tabbar:
+        argv += ["-S", str(TABBAR_LUA)]
     if line:
         argv.append("+{}".format(line))
     return argv + [str(path)]

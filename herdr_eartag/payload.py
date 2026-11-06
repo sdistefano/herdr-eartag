@@ -13,8 +13,10 @@ document is printed, for a later run to pick up.
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import os
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -98,6 +100,18 @@ def pad_data(pad: Optional[padmod.Pad]) -> Optional[Dict[str, Any]]:
         "glossary": pad.glossary,
         "todo": {"done": todo[0], "total": todo[1]} if todo else None,
         "read_now": pad.read_now,
+        "nvim": app_nvim(pad.path),
+    }
+
+
+def app_nvim(path: Path) -> Dict[str, Any]:
+    """How the app starts its own nvim on the pad: argv, and the socket it sends mark
+    jumps to (`nvim --server <socket> --remote-send`). One socket per pad path."""
+    digest = hashlib.sha1(str(path).encode("utf-8")).hexdigest()[:12]
+    socket = str(Path(tempfile.gettempdir()) / "eartag-nvim-{}.sock".format(digest))
+    return {
+        "argv": padmod.nvim_argv(path, None, tabbar=False, listen=socket),
+        "socket": socket,
     }
 
 

@@ -1,50 +1,79 @@
 // node --test app/tests: the pure parts of the Herdr app mods (no herdr runtime needed).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { newPanel, ownerOf, plan, prune, splitAddress } from "../mods/eartag-key/toggle.js";
+import { steps } from "../mods/eartag-key/toggle.js";
+import { agentFor, padTerminal, splitAddress, withPad } from "../mods/eartag/layout.js";
 import { effort, gauge, plain, role, status, verdict } from "../mods/eartag/style.js";
 
-const agentPane = { pane: "pa", terminal: "box/t2", tab: "tb1" };
-const panelPane = { pane: "pp", terminal: null, mod: "eartag", tab: "tb1" };
-const otherPane = { pane: "pb", terminal: "box/t18", tab: "tb2" };
-
-test("opens a panel for an agent pane without one", () => {
-  const step = plan({ pane: "pa", terminal: "box/t2" }, [agentPane], {});
-  assert.deepEqual(step, { kind: "open", pane: "pa", terminal: "box/t2" });
+const tree = (hidden, active, pad) => ({
+  id: "root",
+  children: [
+    {
+      id: "panel",
+      hidden,
+      children: [
+        {
+          id: "panel-body",
+          type: "stack",
+          active,
+          children: [
+            { id: "changes" },
+            { id: "eartag", type: "column", children: [{ id: "eartag-view" }, ...(pad ? [{ id: "eartag-pad", content: { terminal: pad } }] : [])] },
+          ],
+        },
+      ],
+    },
+  ],
 });
 
-test("closes the agent's live panel", () => {
-  const step = plan({ pane: "pa", terminal: "box/t2" }, [agentPane, panelPane], { "box/t2": "pp" });
-  assert.deepEqual(step, { kind: "close", pane: "pp", terminal: "box/t2" });
+test("Alt+I shows Eartag when the panel is hidden", () => {
+  assert.deepEqual(steps(tree(true, "eartag")), [
+    ["layout.select", { stack: "panel-body", child: "eartag" }],
+    ["layout.show", { id: "panel" }],
+  ]);
 });
 
-test("pressed inside the panel closes that panel", () => {
-  const step = plan({ pane: "pp", terminal: null }, [agentPane, panelPane], { "box/t2": "pp" });
-  assert.deepEqual(step, { kind: "close", pane: "pp", terminal: "box/t2" });
+test("Alt+I switches from Changes to Eartag", () => {
+  assert.equal(steps(tree(false, "changes"))[0][0], "layout.select");
 });
 
-test("a second agent gets its own panel, not the first's", () => {
-  const step = plan({ pane: "pb", terminal: "box/t18" }, [agentPane, panelPane, otherPane], { "box/t2": "pp" });
-  assert.deepEqual(step, { kind: "open", pane: "pb", terminal: "box/t18" });
+test("Alt+I hides Eartag when it shows", () => {
+  assert.deepEqual(steps(tree(false, "eartag")), [["layout.hide", { id: "panel" }]]);
 });
 
-test("a registry entry whose panel is gone reopens", () => {
-  const step = plan({ pane: "pa", terminal: "box/t2" }, [agentPane], { "box/t2": "pp" });
-  assert.equal(step.kind, "open");
+test("Alt+I does nothing in a layout without Eartag", () => {
+  assert.deepEqual(steps({ id: "root", children: [] }), []);
 });
 
-test("nothing focused does nothing", () => {
-  assert.deepEqual(plan(null, [], {}), { kind: "none" });
+test("withPad adds, swaps and removes the nvim block without touching the input", () => {
+  const root = tree(false, "eartag");
+  const one = withPad(root, "box/t30");
+  assert.equal(padTerminal(one), "box/t30");
+  assert.equal(padTerminal(root), null);
+  assert.equal(padTerminal(withPad(one, "box/t31")), "box/t31");
+  assert.equal(padTerminal(withPad(one, null)), null);
+  assert.equal(withPad({ id: "root" }, "box/t30"), null);
 });
 
-test("newPanel finds the split eartag pane in the tab", () => {
-  assert.equal(newPanel([agentPane], [agentPane, panelPane], "tb1"), "pp");
-  assert.equal(newPanel([agentPane, panelPane], [agentPane, panelPane], "tb1"), null);
+const A = [
+  { address: "box/t2", tab: "tb1" },
+  { address: "box/t5", tab: "tb1" },
+  { address: "box/t18", tab: "tb2" },
+];
+
+test("the panel follows the focused agent", () => {
+  assert.equal(agentFor({ tab: "tb2", terminal: "box/t18" }, A, {}), "box/t18");
 });
 
-test("prune drops closed panels; ownerOf finds the terminal", () => {
-  assert.deepEqual(prune({ "box/t2": "pp", "box/t18": "gone" }, [panelPane]), { "box/t2": "pp" });
-  assert.deepEqual(ownerOf({ "box/t2": "pp" }, "pp"), ["box/t2", "pp"]);
+test("focusing a shell or the pad nvim keeps the agent last focused in that tab", () => {
+  const last = {};
+  agentFor({ tab: "tb1", terminal: "box/t5" }, A, last);
+  assert.equal(agentFor({ tab: "tb1", terminal: "box/t30" }, A, last), "box/t5");
+});
+
+test("a tab never focused shows its first agent; a tab without agents none", () => {
+  assert.equal(agentFor({ tab: "tb1", terminal: "box/t9" }, A, {}), "box/t2");
+  assert.equal(agentFor({ tab: "tb9", terminal: "t1" }, A, {}), null);
 });
 
 test("splitAddress strips the machine prefix", () => {

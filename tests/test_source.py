@@ -257,6 +257,21 @@ class PayloadTests(unittest.TestCase):
         )
         self.assertEqual(data["glossary"]["t"], "todo")
 
+    def test_pad_carries_an_app_nvim(self):
+        parsed = pad.parse(PAD_TEXT, Path("/var/scratchpad/hc-gaucho:1.md"))
+        nvim = payload.pad_data(parsed)["nvim"]
+        self.assertEqual(nvim["argv"][0], "nvim")
+        self.assertEqual(nvim["argv"][-1], "/var/scratchpad/hc-gaucho:1.md")
+        self.assertNotIn(
+            str(pad.TABBAR_LUA), nvim["argv"]
+        )  # the app draws its own tab bar
+        listen = nvim["argv"].index("--listen")
+        self.assertEqual(nvim["argv"][listen + 1], nvim["socket"])
+        other = payload.pad_data(
+            pad.parse(PAD_TEXT, Path("/var/scratchpad/other:2.md"))
+        )
+        self.assertNotEqual(nvim["socket"], other["nvim"]["socket"])  # one nvim per pad
+
     def test_no_pad_is_null(self):
         self.assertIsNone(payload.pad_data(None))
 

@@ -200,13 +200,15 @@ MIT
 
 ## Herdr app
 
-The same panel for the [Herdr app](https://herdr.dev) (the GPUI desktop client of herdr-core), as a native mod.
-Its data comes from the agent's machine: the mod runs `python3 ~/proj/herdr-eartag/eartag.py json --terminal tN`
-there with `exec`, and that prints the panel's view model as JSON (no ANSI; the mod colors it with the app theme).
+The same panel for the [Herdr app](https://herdr.dev) (the GPUI desktop client of herdr-core), as a native side
+panel next to Files and Changes. It follows the agent you focus. Its data comes from the agent's machine: the mod
+runs `python3 ~/proj/herdr-eartag/eartag.py json --terminal tN` there with `exec`, and that prints the panel's view
+model as JSON (no ANSI; the mod colors it with the app theme).
 
-- **Alt+I** on an agent pane opens the panel on its right; Alt+I again (on the agent or inside the panel) closes it.
-- **Recap** tab: as the TUI panel. **Pad** tab: one line per ` mark of the tab's scratch pad; a click opens the pad
-  in nvim at that line, in a split below the panel.
+- **Alt+I** shows or hides the panel.
+- **Recap** tab: as the TUI panel, without the agent's reply (it is in the agent pane already).
+- **Pad** tab: one line per ` mark of the tab's scratch pad, and under it a real nvim on the pad, running on the
+  agent's machine. Clicking a mark moves that nvim to the mark's line.
 
 Install (copy, don't symlink: mods can't import across folders or through links):
 
@@ -214,6 +216,8 @@ Install (copy, don't symlink: mods can't import across folders or through links)
 cp -r app/mods/eartag app/mods/eartag-key ~/.config/herdr-app/mods/
 ```
 
-Then add a 1 px block `{ "type": "block", "content": { "mod": "eartag-key" }, "size": { "px": 1 } }` to your layout,
-and `"alt-i": "eartag-key.toggle"` under `global` in `~/.config/herdr-app/keys.json`. Details in
+In your own layout (clone `main` first: shipped layouts are read-only), add to the `panel-body` stack's children
+`{ "id": "eartag", "type": "column", "children": [ { "id": "eartag-view", "type": "block", "content": { "mod": "eartag" } } ] }`,
+and a 1 px block `{ "type": "block", "content": { "mod": "eartag-key" }, "size": { "px": 1 } }` at the root. Then
+`"alt-i": "eartag-key.toggle"` under `global` in `~/.config/herdr-app/keys.json`. Details in
 [docs/RECIPE.md](docs/RECIPE.md). Tests: `python3 -m unittest discover -s tests` and `node --test app/tests/`.
