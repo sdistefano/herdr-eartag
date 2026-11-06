@@ -3,6 +3,10 @@
 -- numbers or sign column, and one buffer at a time. The person's nvim config is untouched
 -- everywhere else.
 
+-- The tab's scratch pane has the same pad open: no swap here, no W325 when opening another.
+vim.opt.swapfile = false
+vim.opt.shortmess:append("A")
+
 -- Window-local look, applied again whenever a window shows a buffer: plugins (LazyVim's
 -- statuscolumn, bufferline) set these on their own events.
 local function bare()

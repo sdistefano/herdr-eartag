@@ -20,9 +20,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
-RESOLVE_TTL = 30.0  # herdr may renumber tab ids after a close: resolve again now and then
+RESOLVE_TTL = (
+    30.0  # herdr may renumber tab ids after a close: resolve again now and then
+)
 TABBAR_LUA = Path(__file__).with_name("pad_tabbar.lua")
-APP_LUA = Path(__file__).with_name("pad_app.lua")  # the Herdr app panel's nvim: bare, one buffer
+APP_LUA = Path(__file__).with_name(
+    "pad_app.lua"
+)  # the Herdr app panel's nvim: bare, one buffer
 RELOAD_VIM = Path(os.path.expanduser("~")) / ".cache" / "herdr-scratch" / "reload.vim"
 
 _HEADING_RE = re.compile(r"^#{2,6}\s+`([a-z])\b\s*(.*)$")
@@ -101,7 +105,9 @@ def _glossary(lines: List[str]) -> Dict[str, str]:
 
 
 def _sections(lines: List[str]) -> List[Section]:
-    heads = [(i, m) for i, m in ((i, _HEADING_RE.match(l)) for i, l in enumerate(lines)) if m]
+    heads = [
+        (i, m) for i, m in ((i, _HEADING_RE.match(l)) for i, l in enumerate(lines)) if m
+    ]
     out: List[Section] = []
     for n, (i, m) in enumerate(heads):
         end = heads[n + 1][0] - 1 if n + 1 < len(heads) else len(lines) - 1
@@ -136,7 +142,9 @@ class PadWatcher:
         # resolver: pane dict -> pad path (the herdr TUI's `resolve` by default; the
         # herdr-core source asks `scratch` as that terminal instead).
         self.resolver = resolver or resolve
-        self.available = shutil.which("scratch") is not None if available is None else available
+        self.available = (
+            shutil.which("scratch") is not None if available is None else available
+        )
         self.pad: Optional[Pad] = None
         self._path: Optional[Path] = None
         self._key: Tuple[str, str] = ("", "")
@@ -200,11 +208,17 @@ def resolve(pane: dict) -> Optional[Path]:
     return Path(out) if proc.returncode == 0 and out else None
 
 
-def nvim_argv(path: Path, line: Optional[int], tabbar: bool = True, listen: Optional[str] = None) -> List[str]:
+def nvim_argv(
+    path: Path, line: Optional[int], tabbar: bool = True, listen: Optional[str] = None
+) -> List[str]:
     """nvim on the pad with the same live reload and keys as the scratch pane, plus the
     panel's tab bar (the TUI; the Herdr app draws its own); `+line` puts the cursor on the
     mark that was clicked; `listen`: a socket the app drives it through (mark jumps)."""
     argv = ["nvim"]
+    if not tabbar:
+        # The app's nvim shares the pad with the tab's scratch pane: no swap file of its
+        # own, and no W325 "ignoring swapfile" prompt on every open (set before the file loads).
+        argv += ["-n", "--cmd", "set shortmess+=A"]
     if listen:
         argv += ["--listen", listen]
     if RELOAD_VIM.exists():

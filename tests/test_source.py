@@ -296,6 +296,11 @@ class PayloadTests(unittest.TestCase):
         )  # one file, no tabline or numbers
         self.assertEqual(nvim["argv"][app_lua - 1], "-S")
         self.assertTrue(pad.APP_LUA.exists())
+        # Another nvim (the tab's scratch pane) has the pad open: no swap, no W325 prompt.
+        self.assertIn("-n", nvim["argv"])
+        self.assertEqual(
+            nvim["argv"][nvim["argv"].index("--cmd") + 1], "set shortmess+=A"
+        )
         listen = nvim["argv"].index("--listen")
         self.assertEqual(nvim["argv"][listen + 1], nvim["socket"])
         other = payload.pad_data(
