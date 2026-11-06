@@ -208,7 +208,8 @@ model as JSON (no ANSI; the mod colors it with the app theme).
 - **Alt+I** shows or hides the panel.
 - **Recap** tab: as the TUI panel, without the agent's reply (it is in the agent pane already).
 - **Pad** tab: one line per ` mark of the tab's scratch pad, and under it a real nvim on the pad, running on the
-  agent's machine. Clicking a mark moves that nvim to the mark's line.
+  agent's machine. Clicking a mark moves that nvim to the mark's line. A tab without a pad gets one, bound to the
+  agent's session, the first time you open its Pad tab.
 
 Install (copy, don't symlink: mods can't import across folders or through links):
 

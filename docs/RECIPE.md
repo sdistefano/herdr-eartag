@@ -37,7 +37,9 @@ marks above a real nvim on that pad.
 - Pad tab: `hc run --on <machine> --bg --no-parent --rm -- nvim --listen <socket> <pad>` (argv and socket come in
   the JSON), then `layout.set` adds `{id: "eartag-pad", content: {terminal}}` under the panel; Recap removes it (nvim
   keeps running for next time). A mark click: `nvim --server <socket> --remote-send "<C-\><C-N>:<line><CR>zt"` on
-  that machine. An nvim that exited is started again.
+  that machine. An nvim that exited is started again. A tab without a pad gets one the first time its Pad tab
+  shows: `eartag.py pad-start --terminal tN` = `HC_TERMINAL_ID=tN scratch --set-session <agent session>` (what the
+  SessionStart hook does: line 1 binds the pad to that session; no pane opens), once per agent; failures are shown.
 - Box unreachable / eartag failing: a quiet message, or the last document flagged "stale". Never a crash.
 
 ## Built from
