@@ -18,7 +18,7 @@ import subprocess
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 RESOLVE_TTL = 30.0  # herdr may renumber tab ids after a close: resolve again now and then
 TABBAR_LUA = Path(__file__).with_name("pad_tabbar.lua")
@@ -127,8 +127,15 @@ def _read_now(pad: Pad) -> Optional[int]:
 class PadWatcher:
     """Resolves the pad of the agent pane's tab and re-parses it when the file changes."""
 
-    def __init__(self) -> None:
-        self.available = shutil.which("scratch") is not None
+    def __init__(
+        self,
+        resolver: Optional[Callable[[dict], Optional[Path]]] = None,
+        available: Optional[bool] = None,
+    ) -> None:
+        # resolver: pane dict -> pad path (the herdr TUI's `resolve` by default; the
+        # herdr-core source asks `scratch` as that terminal instead).
+        self.resolver = resolver or resolve
+        self.available = shutil.which("scratch") is not None if available is None else available
         self.pad: Optional[Pad] = None
         self._path: Optional[Path] = None
         self._key: Tuple[str, str] = ("", "")
@@ -143,7 +150,7 @@ class PadWatcher:
         key = (str(pane.get("tab_id") or ""), str(pane.get("workspace_id") or ""))
         if key != self._key or now - self._resolved_at > RESOLVE_TTL:
             self._key, self._resolved_at = key, now
-            path = resolve(pane)
+            path = self.resolver(pane)
             if path != self._path:
                 self._path, self._mtime = path, 0.0
                 if path is None and self.pad is not None:

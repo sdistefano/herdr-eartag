@@ -11,6 +11,7 @@ from . import claude, codex, efforts, gitinfo, herdr, pad, prefs, statusline, te
 from .config import Config
 from .i18n import Tr
 from .render import Bar, View
+from .source import HerdrSource
 from .summarize import Summarizer
 
 PANE_POLL = 1.5
@@ -39,8 +40,11 @@ def split_verdict(text: str) -> Tuple[str, str]:
 
 
 class PanelModel:
-    def __init__(self, target_pane: str, cfg: Config, tr: Tr):
+    def __init__(self, target_pane: str, cfg: Config, tr: Tr, source: Optional[Any] = None):
+        """target_pane: a herdr pane id, or a herdr-core terminal with a CoreSource.
+        source: where pane facts come from (see source.py); the herdr TUI by default."""
         self.target = target_pane
+        self.source = source or HerdrSource()
         self.cfg = cfg
         self.tr = tr
         self.pane: Optional[Dict[str, Any]] = None
@@ -65,7 +69,8 @@ class PanelModel:
         self.needs_setup = False
         self.set_summarize(prefs.summarize_wanted(prefs.load(), cfg.summarize))
         self.error = ""
-        self.pads = pad.PadWatcher()  # the scratch pad of the agent's herdr tab, if any
+        # the scratch pad of the agent's tab, if any
+        self.pads = pad.PadWatcher(self.source.pad_path, self.source.scratch_available())
 
     def set_summarize(self, on: bool) -> None:
         if not on:
@@ -98,7 +103,7 @@ class PanelModel:
         if now >= self._next_pane:
             self._next_pane = now + PANE_POLL
             try:
-                pane = herdr.pane_get(self.target)
+                pane = self.source.pane(self.target)
                 self.error = ""
             except herdr.HerdrError as exc:
                 self.error = exc.code
@@ -147,7 +152,7 @@ class PanelModel:
         before = (self.git, self.others, self.tasks, self.git_files, self.diff)
         self.git = gitinfo.find(self.cwd)
         try:
-            self.agents = herdr.agent_list()
+            self.agents = self.source.agents()
         except herdr.HerdrError:
             pass
         self.tasks = claude.read_tasks(self.session_id) if self.agent == "claude" else None

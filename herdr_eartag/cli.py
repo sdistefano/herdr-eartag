@@ -306,6 +306,26 @@ def cmd_preview(args) -> int:
     return 0
 
 
+def cmd_json(args) -> int:
+    """One JSON document with everything the panel draws, for a herdr-core terminal
+    (the Herdr app mod runs this on the box with `exec`). Never waits on rephrasing."""
+    from . import payload
+    from .panel import PanelModel
+    from .source import CoreSource
+
+    cfg = load_config()
+    model = PanelModel(args.terminal, cfg, _tr(cfg) if not args.lang else Tr(args.lang), source=CoreSource())
+    if model.summarizer:
+        model.summarizer = payload.CachedSummarizer(model.summarizer.backend, model.summarizer.model)
+    model.poll()
+    error = "no_terminal" if model.pane_missing else model.error
+    view = model.view(args.width or cfg.width, 36, None)
+    doc = payload.document(args.terminal, model.session_id, view, model.pads.pad, error)
+    sys.stdout.write(json.dumps(doc, ensure_ascii=False) + "\n")
+    payload.warm_detached(model.summarizer)
+    return 0
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="eartag.py", description="herdr eartag panel")
     sub = parser.add_subparsers(dest="cmd")
@@ -338,6 +358,11 @@ def main(argv=None) -> int:
     p.add_argument("--icons")
     p.add_argument("--plain", action="store_true")
     p.set_defaults(func=cmd_preview)
+    p = sub.add_parser("json", help="the panel as JSON for a herdr-core terminal (Herdr app mod)")
+    p.add_argument("--terminal", required=True, help="herdr-core terminal address, e.g. t18")
+    p.add_argument("--width", type=int, help="columns the text is fitted to (default: config width)")
+    p.add_argument("--lang")
+    p.set_defaults(func=cmd_json)
     args = parser.parse_args(argv)
     if not getattr(args, "func", None):
         parser.print_help()
