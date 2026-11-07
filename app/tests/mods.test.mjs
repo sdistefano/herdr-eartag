@@ -148,3 +148,15 @@ test("withPadBlock puts the nvim block back, or points it at another machine", (
   assert.equal(withPadBlock({ id: "root" }, "box/eartag-pad"), null);
   assert.equal(bare.children[0].children.length, 1); // input untouched
 });
+
+test("Alt+I works when the app collapsed the panel column into panel-body", () => {
+  const collapsed = (hidden, active) => ({
+    id: "root",
+    children: [{ id: "panel-body", type: "stack", hidden, active, children: [{ id: "changes" }, { id: "eartag" }] }],
+  });
+  assert.deepEqual(steps(collapsed(true, "eartag")), [
+    ["layout.select", { stack: "panel-body", child: "eartag" }],
+    ["layout.show", { id: "panel-body" }],
+  ]);
+  assert.deepEqual(steps(collapsed(false, "eartag")), [["layout.hide", { id: "panel-body" }]]);
+});

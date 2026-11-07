@@ -1,5 +1,6 @@
 // tabs-eartag: the shipped tab bar (`tabs`, cloned with mod.clone) plus an Eartag button left of
-// Changes that shows or hides the Eartag side panel. The only change is that one line in render();
+// Changes that shows or hides the Eartag side panel, and showing/hiding whichever of "panel" or
+// "panel-body" exists (the app collapses the first into the second). Those are the only changes;
 // re-clone `tabs` and add it again to pick up a newer shipped tab bar.
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex } from "gpui-base";
@@ -32,8 +33,8 @@ export default class Tabs extends View {
         const stored = this.panels[space.id] ?? null, want = enabled.includes(stored) ? stored : null;
         if (want !== now) {
           this.pending = { want, until: Date.now() + 1000 };
-          if (want) { run("layout.select", { stack: "panel-body", child: want }); run("layout.show", { id: "panel" }); }
-          else run("layout.hide", { id: "panel" });
+          if (want) { run("layout.select", { stack: "panel-body", child: want }); run("layout.show", { id: panel.id }); }
+          else run("layout.hide", { id: panel.id });
           return;
         }
       }
@@ -79,7 +80,9 @@ export default class Tabs extends View {
     const lightsPadding = w?.platform === "macos" && w.titlebar === "none" && !w.fullscreen && root?.traffic_lights
       ? Math.max(10, (root.traffic_lights[0] + 64) / settings().zoom - (sidebar?.hidden ? 0 : sidebar?.size?.px ?? 0))
       : 10;
-    const panel = find(root, "panel"), body = find(root, "panel-body");
+    // The app collapses the single-child "panel" column into "panel-body" when it rewrites the
+    // layout file: show and hide whichever of the two exists.
+    const body = find(root, "panel-body"), panel = find(root, "panel") ?? body, panelId = panel?.id ?? "panel";
     const enabled = shared("workspace.panels") ?? ["files", "changes"];
     this.syncPanel(space, panel, body, enabled);
     const panelButton = (id, label, icon) => {
@@ -88,8 +91,8 @@ export default class Tabs extends View {
         .text_size(12).bg(on ? t.selected : t.chrome).text_color(on ? t.foreground : t.muted)
         .hover(s => s.bg(t.hover)).on_mouse_down("left", stop)
         .on_click(() => {
-          if (on) run("layout.hide", { id: "panel" });
-          else { run("layout.select", { stack: "panel-body", child: id }); run("layout.show", { id: "panel" }); }
+          if (on) run("layout.hide", { id: panelId });
+          else { run("layout.select", { stack: "panel-body", child: id }); run("layout.show", { id: panelId }); }
         }).child(svg(icon).size(14)).child(label);
     };
     return h_flex().size_full().min_w(0).px(10).pl(lightsPadding).gap(3).items_center().bg(t.chrome).border_b(1).border_color(t.border)

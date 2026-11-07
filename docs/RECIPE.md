@@ -60,6 +60,9 @@ scratch pad, as a real nvim filling the panel.
 ## Watch out
 
 - The mod runtime has no `structuredClone` (node has, so tests pass): copy trees with a JSON round trip.
+- When the app rewrites the layout file it collapses single-child containers: the `panel` column vanished and
+  `panel-body` took its size. Show/hide whichever of `panel` / `panel-body` exists, never the id `panel` alone
+  (the shipped tab bar does: `tabs-eartag` is patched for it).
 - The app drops a terminal block from the layout file when its terminal ends; the panel puts it back with a
   direct file edit (`readTextFile` + `writeTextFile` of `layouts/<shown>.json`), which keeps the clicks.
 - Never `layout.set` at run time: it replaces the file and wipes the layout's clicks (`layouts/.state`), sizes and

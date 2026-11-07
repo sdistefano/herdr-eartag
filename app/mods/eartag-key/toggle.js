@@ -17,14 +17,18 @@ function find(node, id) {
   return null;
 }
 
+/** The node that is shown and hidden: the `panel` column, or the stack itself when the app
+ *  collapsed that single-child column into it (it does when it rewrites the layout file). */
+export const panelNode = (root) => find(root, PANEL) ?? find(root, STACK);
+
 /** The commands for one press, as [name, args] pairs; [] when the layout has no Eartag. */
 export function steps(root) {
   const stack = find(root, STACK);
   if (!find(stack, CHILD)) return [];
-  const shown = !find(root, PANEL)?.hidden && stack.active === CHILD;
-  if (shown) return [["layout.hide", { id: PANEL }]];
+  const panel = panelNode(root);
+  if (!panel.hidden && stack.active === CHILD) return [["layout.hide", { id: panel.id }]];
   return [
     ["layout.select", { stack: STACK, child: CHILD }],
-    ["layout.show", { id: PANEL }],
+    ["layout.show", { id: panel.id }],
   ];
 }

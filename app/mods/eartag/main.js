@@ -63,7 +63,7 @@ export default class Eartag extends View {
   /** The panel is the shown child of a visible panel column. */
   visible() {
     const root = layout();
-    const panel = find(root, "panel");
+    const panel = find(root, "panel") ?? find(root, "panel-body"); // the app may collapse "panel"
     const body = find(root, "panel-body");
     return Boolean(find(root, COLUMN_ID)) && !panel?.hidden && (!body || body.active === COLUMN_ID);
   }
