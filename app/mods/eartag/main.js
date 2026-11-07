@@ -19,6 +19,9 @@ const TICK_MS = 1000; // cheap: follows focus; fetching is paced below
 const POLL_MS = 3000; // while the agent works, or right after its status changed
 const IDLE_POLL_MS = 15000; // otherwise
 const NVIM_CHECK_MS = 10000; // how often the Pad tab checks its nvim is still running
+const NVIM_RETRY_MS = 5000; // after a failure (box unreachable, nvim gone): try again this soon
+const STUCK_MS = 45000; // a check still running after this hung (exec gives up at 30 s): drop it
+const PAD_RETRY_MS = 30000; // a pad that could not be created is tried again after this
 
 const ERRORS = {
   unreachable: "Box unreachable",
@@ -49,7 +52,7 @@ export default class Eartag extends View {
     this.lastByTab = {}; // tab -> agent last focused there
     this.results = {}; // address -> { doc, error?, detail?, at, status }
     this.busy = new Set(); // addresses being fetched
-    this.nvim = { file: null, at: 0, busy: false, error: null }; // the named pad nvim
+    this.nvim = { file: null, at: 0, busy: 0, run: 0, error: null }; // the named pad nvim
     this.padStarts = {}; // address -> "running" | { error, detail }: one try per agent
     this.hoverBar = null;
     this.tick(cx);
@@ -124,16 +127,19 @@ export default class Eartag extends View {
     for (const [name, args] of padSteps(root, Boolean(ready))) run(name, args);
   }
 
-  /** On the Pad tab, an agent whose tab has no pad gets one (once; a failure is shown). */
+  /** On the Pad tab, an agent whose tab has no pad gets one. A failure is shown and tried
+   *  again after PAD_RETRY_MS (the box may have been unreachable). */
   ensurePad(cx) {
     const address = this.address;
     const doc = this.result()?.doc;
-    if (this.tab !== "pad" || !doc || doc.pad || !this.visible() || this.padStarts[address]) return;
+    const tried = this.padStarts[address];
+    const retry = tried?.error && Date.now() - tried.at > PAD_RETRY_MS;
+    if (this.tab !== "pad" || !doc || doc.pad || !this.visible() || (tried && !retry)) return;
     this.padStarts[address] = "running";
     cx.notify();
     cx.spawn(async (cx) => {
       const started = await startPad(address);
-      this.padStarts[address] = started.error ? started : "done";
+      this.padStarts[address] = started.error ? { ...started, at: Date.now() } : "done";
       cx.notify();
       if (!started.error) this.refreshNow(address, cx);
     });
@@ -148,14 +154,18 @@ export default class Eartag extends View {
   /** Start the nvim or point it at this pad, when the pad changed or now and then. */
   checkNvim(pad, machine, cx) {
     const n = this.nvim;
-    const fresh = n.file === pad.path && Date.now() - n.at < NVIM_CHECK_MS;
-    if (n.busy || fresh) return;
-    n.busy = true;
+    if (n.busy && Date.now() - n.busy < STUCK_MS) return;
+    const since = Date.now() - n.at;
+    if (n.error ? since < NVIM_RETRY_MS : n.file === pad.path && since < NVIM_CHECK_MS) return;
+    const run = ++n.run; // a hung check that comes back late must not overwrite a newer one
+    n.busy = Date.now();
     cx.spawn(async (cx) => {
-      n.error = (await showPad(machine, pad, n.file)) ?? (await this.placeBlock(`${machine}/${pad.nvim.name}`));
-      n.file = n.error ? null : pad.path;
+      const error = (await showPad(machine, pad, n.file)) ?? (await this.placeBlock(`${machine}/${pad.nvim.name}`));
+      if (run !== n.run) return;
+      n.error = error;
+      n.file = error ? null : pad.path;
       n.at = Date.now();
-      n.busy = false;
+      n.busy = 0;
       cx.notify();
       this.syncPad(cx);
     });

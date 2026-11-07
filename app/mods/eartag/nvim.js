@@ -25,6 +25,16 @@ async function send(machine, pad, keys) {
   }
 }
 
+/** Does the nvim answer on its socket? */
+async function answers(machine, pad) {
+  try {
+    const r = await exec("nvim", ["--server", pad.nvim.socket, "--remote-expr", "1"], { on: machine });
+    return r.code === 0 && r.stdout.trim() === "1";
+  } catch (_e) {
+    return false;
+  }
+}
+
 /** Start it on this pad. A stale socket from a killed nvim would stop --listen: drop it first. */
 async function start(machine, pad) {
   try {
@@ -36,12 +46,26 @@ async function start(machine, pad) {
   }
 }
 
+/** End the named nvim (it is ours: label eartag.pad=1). */
+async function stop(machine, name) {
+  try {
+    await hc(["kill", `${machine}/${name}`]);
+  } catch (_e) {
+    // already gone
+  }
+}
+
 /** The named nvim shows `pad` on `machine`: started, or told to open it (EartagOpen saves
- *  the pad it had open first and wipes it, so buffers never pile up). `current` is the path it showed last. Resolves with an error or null. */
+ *  the pad it had open first and wipes it, so buffers never pile up). An nvim that is live
+ *  but does not answer on its socket (after a reconnect, say) is replaced by a fresh one.
+ *  `current` is the path it showed last. Resolves with an error or null. */
 export async function showPad(machine, pad, current) {
-  if (!(await live(machine, pad.nvim.name))) return (await start(machine, pad)) ? null : "nvim did not start on the box";
-  if (current === pad.path) return null;
+  const name = pad.nvim.name;
+  if (!(await live(machine, name))) return (await start(machine, pad)) ? null : "nvim did not start on the box";
+  if (current === pad.path && (await answers(machine, pad))) return null;
   // EartagOpen (pad_app.lua): save, open, wipe the other buffers.
   const keys = `<C-\\><C-N><Cmd>lua EartagOpen([[${pad.path}]])<CR>`;
-  return (await send(machine, pad, keys)) ? null : "nvim did not answer";
+  if (await send(machine, pad, keys)) return null;
+  await stop(machine, name);
+  return (await start(machine, pad)) ? null : "nvim did not answer and could not be restarted";
 }

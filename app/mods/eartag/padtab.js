@@ -13,11 +13,11 @@ export function padTab(t, pad, status = {}) {
   const [title, detail, bad] = status.offBox
     ? ["Pads live on the agent's machine.", "This agent runs on this computer, which has no scratch pads.", false]
     : failed
-      ? ["Could not start a scratch pad.", status.starting.detail ?? "", true]
+      ? ["Could not start a scratch pad. Retrying…", status.starting.detail ?? "", true]
       : !pad
         ? ["Starting a scratch pad for this tab…", "", false]
         : status.nvimError
-          ? ["Could not open nvim on the pad.", status.nvimError, true]
+          ? ["Could not open nvim on the pad. Retrying…", status.nvimError, true]
           : ["Opening nvim…", pad.path, false];
   return v_flex()
     .gap(4)
