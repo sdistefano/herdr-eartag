@@ -49,6 +49,8 @@ scratch pad, as a real nvim filling the panel.
 - `mods/eartag` (`place: none`): `main.js` (view, polling, focus), `layout.js` (pure: which agent, the nvim block
   edit), `data.js` (`exec("python3", ["proj/herdr-eartag/eartag.py", "json", "--terminal", tN], {on: machine})`),
   `nvim.js`, `recap.js`, `padtab.js`, `style.js`.
+- `mods/tabs-eartag`: `mod.clone` of the shipped `tabs`, one added line: an Eartag `panelButton` left of
+  Changes (tag icon `eartag.svg`), shown when `workspace.panels` lists `eartag`. The layout's `tabs` block uses it.
 - `mods/eartag-key` (`place: none`, a 1px block in the layout, draws nothing): receives `eartag-key.toggle`, decides
   with `toggle.js` (pure). Adds `eartag` to `shared("workspace.panels")`, or the tab bar closes it on a space switch.
 - Box side: `eartag.py json` = `PanelModel` with `source.CoreSource` (`hc get tN --json` +

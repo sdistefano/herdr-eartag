@@ -205,7 +205,7 @@ panel next to Files and Changes. It follows the agent you focus. Its data comes 
 runs `python3 ~/proj/herdr-eartag/eartag.py json --terminal tN` there with `exec`, and that prints the panel's view
 model as JSON (no ANSI; the mod colors it with the app theme).
 
-- **Alt+I** shows or hides the panel.
+- **Alt+I**, or the **Eartag** button left of Changes in the tab bar, shows or hides the panel.
 - **Recap** tab: as the TUI panel, without the agent's reply (it is in the agent pane already).
 - **Pad** tab: a real nvim on the tab's scratch pad, filling the panel, running on the agent's machine. A tab
   without a pad gets one, bound to the agent's session, the first time you open its Pad tab.
@@ -213,12 +213,13 @@ model as JSON (no ANSI; the mod colors it with the app theme).
 Install (copy, don't symlink: mods can't import across folders or through links):
 
 ```sh
-cp -r app/mods/eartag app/mods/eartag-key ~/.config/herdr-app/mods/
+cp -r app/mods/eartag app/mods/eartag-key app/mods/tabs-eartag ~/.config/herdr-app/mods/
 ```
 
 In your own layout (clone `main` first: shipped layouts are read-only), add to the `panel-body` stack's children
 `{ "id": "eartag", "type": "column", "children": [ { "id": "eartag-view", "type": "block", "content": { "mod": "eartag" } },
 { "id": "eartag-pad", "type": "block", "hidden": true, "content": { "terminal": "<machine>/eartag-pad" } } ] }`,
-and a 1 px block `{ "type": "block", "content": { "mod": "eartag-key" }, "size": { "px": 1 } }` at the root. Then
+a 1 px block `{ "type": "block", "content": { "mod": "eartag-key" }, "size": { "px": 1 } }` at the root, and
+point the `tabs` block at `tabs-eartag` (the shipped tab bar plus the Eartag button). Then
 `"alt-i": "eartag-key.toggle"` under `global` in `~/.config/herdr-app/keys.json`. Details in
 [docs/RECIPE.md](docs/RECIPE.md). Tests: `python3 -m unittest discover -s tests` and `node --test app/tests/`.
